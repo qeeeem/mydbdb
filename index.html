@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>我的书影音</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0e0e0f;
+  --bg2: #161618;
+  --bg3: #1e1e21;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.13);
+  --text: #f0ede8;
+  --text2: #8c8a86;
+  --text3: #4a4845;
+  --r: 8px;
+  --col-movie: #EF9F27;
+  --col-tv: #1D9E75;
+  --col-book: #7F77DD;
+  --col-game: #639922;
+  --col-music: #D4537E;
+}
+
+body { background: var(--bg); color: var(--text); font-family: -apple-system,'PingFang SC','Noto Sans SC',sans-serif; min-height: 100vh;}
+
+/* ── shared header ── */
+header {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(14,14,15,0.92);
+  backdrop-filter: blur(14px);
+  border-bottom: 0.5px solid var(--border);
+  display: flex; align-items: center;
+  padding: 0 2rem; height: 52px; gap: 2rem;
+}
+.site-title { font-size: 14px; font-weight: 500; color: var(--text); white-space: nowrap; flex-shrink: 0; }
+
+.poster-overlay { pointer-events: none; }
+
+.nav-tabs { display: flex; gap: 2px; }
+.nav-tab {
+  padding: 5px 14px; font-size: 16px; border-radius: var(--r);
+  border: none; background: transparent; color: var(--text2);
+  cursor: pointer; font-family: inherit; transition: all .15s;
+}
+.nav-tab:hover { background: var(--bg3); color: var(--text); }
+.nav-tab.active { background: var(--bg3); color: var(--text); }
+
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 1rem; }
+
+/* cat / status filters (shared between gallery & timeline) */
+.filter-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 10px 2rem;
+  border-bottom: 0.5px solid var(--border);
+}
+.filter-btn {
+  padding: 4px 12px; font-size: 12px; border-radius: 20px;
+  border: 0.5px solid var(--border2); background: transparent;
+  color: var(--text2); cursor: pointer; font-family: inherit; transition: all .15s;
+}
+.filter-btn:hover { background: var(--bg3); color: var(--text); }
+.filter-btn.active { color: var(--text); border-color: rgba(255,255,255,0.28); background: var(--bg3); }
+.filter-btn[data-cat="movie"].active { border-color: var(--col-movie); color: var(--col-movie); }
+.filter-btn[data-cat="tv"].active    { border-color: var(--col-tv);    color: var(--col-tv); }
+.filter-btn[data-cat="book"].active  { border-color: var(--col-book);  color: var(--col-book); }
+.filter-btn[data-cat="game"].active        { border-color: var(--col-game);  color: var(--col-game); }
+.filter-btn[data-cat="music"].active       { border-color: var(--col-music); color: var(--col-music); }
+.filter-btn[data-cat="performance"].active { border-color: #D85A30; color: #D85A30; }
+.filter-btn[data-cat="podcast"].active     { border-color: #378ADD; color: #378ADD; }
+.fdivider { width: 0.5px; height: 16px; background: var(--border2); flex-shrink: 0; }
+.count-label { font-size: 12px; color: var(--text3); margin-left: auto; }
+
+/* gallery toolbar */
+.gallery-toolbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 2rem; border-bottom: 0.5px solid var(--border);
+}
+.search-wrap { position: relative; }
+.search-wrap input {
+  background: var(--bg2); border: 0.5px solid var(--border2);
+  border-radius: var(--r); padding: 6px 12px 6px 30px;
+  font-size: 13px; color: var(--text); font-family: inherit;
+  width: 200px; outline: none;
+}
+.search-wrap input:focus { border-color: rgba(255,255,255,0.22); }
+.search-wrap::before {
+  content: ''; position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+  width: 12px; height: 12px; border: 1.5px solid var(--text3); border-radius: 50%;
+  pointer-events: none;
+}
+.sort-btns { display: flex; gap: 5px; }
+.sort-btn {
+  padding: 4px 10px; font-size: 12px; border-radius: var(--r);
+  border: 0.5px solid var(--border2); background: transparent;
+  color: var(--text2); cursor: pointer; font-family: inherit; transition: all .15s;
+}
+.sort-btn:hover { background: var(--bg3); color: var(--text); }
+.sort-btn.active { background: var(--bg3); color: var(--text); border-color: rgba(255,255,255,0.22); }
+
+/* ── pages ── */
+.page { display: none; }
+.page.active { display: block; }
+
+/* ── DASHBOARD ── */
+#page-dashboard { padding: 2rem; }
+.dash-wrap { max-width: 1100px; margin: 0 auto; }
+.sec-title { font-size: 18px; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 1rem; }
+
+.stats {
+  display: grid; grid-template-columns: repeat(8, minmax(0,1fr)); gap: 8px; margin-bottom: 2rem;
+}
+@media (max-width:900px) { .stats { grid-template-columns: repeat(4,1fr); } }
+@media (max-width:560px) { .stats { grid-template-columns: repeat(2,1fr); } }
+.stat { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--r); padding: 12px 14px; border-top: 2px solid transparent; }
+.stat-label { font-size: 11px; color: var(--text2); margin-bottom: 5px; white-space: nowrap; }
+.stat-val { font-size: 22px; font-weight: 500; letter-spacing: -0.02em; }
+
+.hm-wrap { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--r); padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; overflow-x: auto; }
+.hm-controls { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 1.25rem; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--text2); }
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+.yr-btns { display: flex; gap: 5px; flex-wrap: wrap; }
+.yr-btn { padding: 4px 11px; font-size: 12px; border-radius: var(--r); border: 0.5px solid var(--border2); background: transparent; color: var(--text2); cursor: pointer; transition: all .15s; font-family: inherit; }
+.yr-btn:hover { background: var(--bg3); color: var(--text); }
+.yr-btn.active { background: var(--bg3); color: var(--text); border-color: rgba(255,255,255,0.25); }
+.hm-grid-wrap { display: flex; gap: 5px; }
+.day-labels { display: flex; flex-direction: column; gap: 2px; padding-top: 18px; flex-shrink: 0; }
+.day-labels span { height: 11px; line-height: 11px; font-size: 9px; color: var(--text3); text-align: right; padding-right: 5px; white-space: nowrap; }
+.hm-right { min-width: 0; }
+.month-row { display: grid; grid-template-columns: repeat(53, 11px); gap: 2px; margin-bottom: 3px; height: 14px; }
+.month-row span { font-size: 9px; color: var(--text3); white-space: nowrap; overflow: visible; line-height: 14px; }
+.hm-cells { display: grid; grid-template-rows: repeat(7, 11px); grid-auto-flow: column; grid-auto-columns: 11px; gap: 2px; }
+.cell { width: 11px; height: 11px; border-radius: 2px; background: var(--bg3); cursor: default; transition: transform .1s; flex-shrink: 0; }
+.cell.empty { opacity: 0.15; }
+.hm-info { font-size: 11px; color: var(--text2); min-height: 18px; margin-top: 8px; }
+
+.chart-wrap { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--r); padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; }
+.chart-inner { position: relative; height: 220px; margin-top: 1rem; }
+.yrbar-wrap { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--r); padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; }
+.yrbar-inner { position: relative; height: 180px; margin-top: 1rem; }
+
+#d-tooltip { position: fixed; background: #222226; border: 0.5px solid var(--border2); border-radius: var(--r); padding: 8px 12px; font-size: 12px; color: var(--text); pointer-events: none; display: none; z-index: 200; min-width: 110px; line-height: 1.8; }
+
+/* ── GALLERY ── */
+#page-gallery main { padding: 1.5rem 2rem 4rem; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px,1fr)); gap: 20px 14px; }
+.empty-msg { text-align: center; padding: 5rem 2rem; color: var(--text3); font-size: 14px; }
+
+/* ── TIMELINE ── */
+#page-timeline main { padding: 1.5rem 2rem 4rem 0; }
+.tl-year { margin-bottom: 2rem; }
+.tl-year-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 0 8px 20px; cursor: pointer;
+  border-bottom: 0.5px solid var(--border2);
+  margin-bottom: 1rem; user-select: none;
+}
+.tl-year-header:hover .tl-year-title { color: var(--text); }
+.tl-year-title { font-size: 18px; font-weight: 500; color: var(--text2); }
+.tl-year-count { font-size: 12px; color: var(--text3); }
+.tl-year-arrow { margin-left: auto; font-size: 12px; color: var(--text3); transition: transform .2s; }
+.tl-year.collapsed .tl-year-body { display: none; }
+.tl-year.collapsed .tl-year-arrow { transform: rotate(-90deg); }
+
+#page-timeline main { border-left: 1px solid var(--border2); margin-left: 2rem; padding-left: 0; }
+.tl-month::before {
+  content: '';
+  position: absolute;
+  left: -5px; top: 7px;
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1.5px solid var(--border2);
+}
+.tl-month-header { padding-left: 20px; }
+.tl-row { padding-left: 20px; }
+
+.tl-month-header {
+  display: flex; align-items: baseline; gap: 10px;
+  margin-bottom: 12px; padding-bottom: 8px;
+  border-bottom: 0.5px solid var(--border);
+}
+.tl-month-title { font-size: 15px; font-weight: 500; }
+.tl-month-count { font-size: 12px; color: var(--text3); }
+.tl-row {
+  display: flex; gap: 10px; flex-wrap: wrap;
+}
+
+/* ── shared card ── */
+.card { display: flex; flex-direction: column; gap: 8px; cursor: pointer; }
+.poster-wrap {
+  position: relative; aspect-ratio: 2/3; border-radius: var(--r);
+  overflow: hidden; background: var(--bg3); border: 0.5px solid var(--border);
+}
+.poster-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; transition: opacity .2s; }
+.poster-wrap img.loading { opacity: 0; }
+.poster-wrap img.loaded { opacity: 1; }
+.no-poster { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 6px; color: var(--text3); font-size: 11px; text-align: center; padding: 8px; line-height: 1.4; }
+.no-poster .np-cat { font-size: 18px; }
+.poster-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.82); opacity: 0; transition: opacity .18s; display: flex; flex-direction: column; justify-content: flex-end; padding: 10px; gap: 5px; }
+.poster-wrap:hover .poster-overlay { opacity: 1; }
+.ov-rating { font-size: 13px; font-weight: 500; }
+.ov-comment { font-size: 11px; color: rgba(255,255,255,0.7); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 4;line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+.badge { position: absolute; top: 6px; right: 6px; font-size: 12px; padding: 2px 5px; border-radius: 4px; font-weight: 500; }
+.badge-wishlist { background: rgba(0, 0, 0, 0.504); color: #ffffff; }
+.badge-dropped  { background: rgba(216,90,48,0.25); color: #e88a67; }
+.cat-dot { position: absolute; bottom: 6px; left: 6px; width: 6px; height: 6px; border-radius: 50%; }
+.card-title { font-size: 12px; line-height: 1.4; color: var(--text2); display: -webkit-box; -webkit-line-clamp: 2;line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+.card-meta { font-size: 11px; color: var(--text3); }
+
+/* timeline card slightly wider */
+#page-timeline .card { width: 100px; flex-shrink: 0; }
+
+/* ── modal ── */
+.modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; z-index: 300; align-items: center; justify-content: center; padding: 1rem; }
+.modal-bg.open { display: flex; }
+.modal-inner { position: relative; max-width: 520px; width: 100%; }
+.modal { background: var(--bg2); border: 0.5px solid var(--border2); border-radius: 14px; display: flex; gap: 1.25rem; padding: 1.5rem; }
+.modal-poster { width: 110px; flex-shrink: 0; border-radius: 8px; overflow: hidden; background: var(--bg3); aspect-ratio: 2/3; }
+.modal-poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.modal-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.modal-title { font-size: 16px; font-weight: 500; line-height: 1.4; }
+.modal-meta-row { font-size: 12px; color: var(--text2); }
+.modal-rating { font-size: 22px; font-weight: 500; }
+.modal-stars { font-size: 13px; color: var(--col-movie); letter-spacing: 1px; }
+.modal-comment { font-size: 13px; color: var(--text2); line-height: 1.7; border-top: 0.5px solid var(--border); padding-top: 10px; }
+.modal-close { position: absolute; top: 1rem; right: 1rem; width: 28px; height: 28px; border-radius: 50%; background: var(--bg3); border: 0.5px solid var(--border2); color: var(--text2); cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="site-title">书影音</span>
+  <nav class="nav-tabs">
+    <button class="nav-tab active" data-page="dashboard">统计</button>
+    <button class="nav-tab" data-page="gallery">收藏</button>
+    <button class="nav-tab" data-page="timeline">时间轴</button>
+  </nav>
+  <button id="add-btn" onclick="openAddPanel()" style="margin-left:auto;width:28px;height:28px;border-radius:50%;border:0.5px solid var(--border2);background:transparent;color:var(--text2);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">+</button>
+</header>
+
+<!-- ══════════ DASHBOARD ══════════ -->
+<div id="page-dashboard" class="page active">
+<div id="d-tooltip"></div>
+<div style="padding:2rem">
+<div class="dash-wrap">
+  <p class="sec-title" style="margin-bottom:.75rem">总览</p>
+  <div class="stats" id="d-stats"></div>
+  <p class="sec-title">活动热力图</p>
+  <div class="hm-wrap">
+    <div class="hm-controls">
+      <div class="legend" id="d-legend"></div>
+      <div class="yr-btns" id="d-yr-btns"></div>
+    </div>
+    <div class="hm-grid-wrap">
+      <div class="day-labels"><span>一</span><span></span><span>三</span><span></span><span>五</span><span></span><span></span></div>
+      <div class="hm-right">
+        <div class="month-row" id="d-month-row"></div>
+        <div class="hm-cells" id="d-hm-cells"></div>
+      </div>
+    </div>
+  </div>
+  <p class="sec-title">月度分布</p>
+  <div class="chart-wrap"><div class="chart-inner"><canvas id="d-month-chart"></canvas></div></div>
+  <p class="sec-title">年度趋势</p>
+  <div class="yrbar-wrap"><div class="yrbar-inner"><canvas id="d-year-chart"></canvas></div></div>
+</div>
+</div>
+</div>
+
+<!-- ══════════ GALLERY ══════════ -->
+<div id="page-gallery" class="page">
+  <div class="filter-row">
+    <button class="filter-btn active" data-cat="all">全部</button>
+    <button class="filter-btn" data-cat="movie">电影</button>
+    <button class="filter-btn" data-cat="tv">剧集</button>
+    <button class="filter-btn" data-cat="book">书籍</button>
+    <button class="filter-btn" data-cat="game">游戏</button>
+    <button class="filter-btn" data-cat="music">音乐</button>
+    <button class="filter-btn" data-cat="performance">演出</button>
+    <button class="filter-btn" data-cat="podcast">播客</button>
+    <div class="fdivider"></div>
+    <button class="filter-btn active" data-status="all">全部状态</button>
+    <button class="filter-btn" data-status="complete">看过</button>
+    <button class="filter-btn" data-status="wishlist">想看</button>
+    <button class="filter-btn" data-status="progress">在看</button>
+    <button class="filter-btn" data-status="dropped">弃坑</button>
+
+    <span class="count-label" id="g-count"></span>
+  </div>
+  <div class="gallery-toolbar">
+    <div class="search-wrap"><input id="g-search" type="text" placeholder="搜索标题…"></div>
+    <div class="sort-btns">
+      <button class="sort-btn active" data-sort="timestamp">最近标记</button>
+      <button class="sort-btn" data-sort="rating">评分</button>
+      <button class="sort-btn" data-sort="year">年份</button>
+      <button class="sort-btn" data-sort="title">标题</button>
+    </div>
+  </div>
+  <main>
+    <div class="grid" id="g-grid"></div>
+    <div class="empty-msg" id="g-empty" style="display:none">没有符合条件的结果</div>
+  </main>
+</div>
+
+<!-- ══════════ TIMELINE ══════════ -->
+<div id="page-timeline" class="page">
+  <div class="filter-row">
+    <button class="filter-btn active" data-tcat="all">全部</button>
+    <button class="filter-btn" data-tcat="movie">电影</button>
+    <button class="filter-btn" data-tcat="tv">剧集</button>
+    <button class="filter-btn" data-tcat="book">书籍</button>
+<button class="filter-btn" data-tcat="game">游戏</button>
+<button class="filter-btn" data-tcat="music">音乐</button>
+<button class="filter-btn" data-tcat="performance">演出</button>
+<button class="filter-btn" data-tcat="podcast">播客</button>
+    <div class="fdivider"></div>
+    <button class="filter-btn active" data-tstatus="all">全部状态</button>
+    <button class="filter-btn" data-tstatus="complete">看过</button>
+    <button class="filter-btn" data-tstatus="wishlist">想看</button>
+    <button class="filter-btn" data-tstatus="progress">在看</button>
+    <button class="filter-btn" data-tstatus="dropped">弃坑</button>
+
+    <span class="count-label" id="t-count"></span>
+<div style="display:flex;gap:5px;margin-left:8px">
+  <button class="sort-btn active" id="tview-month" onclick="setTView('month')">按月</button>
+  <button class="sort-btn" id="tview-day" onclick="setTView('day')">按日</button>
+</div>
+  </div>
+  <main>
+    <div id="t-list"></div>
+    <div class="empty-msg" id="t-empty" style="display:none">没有符合条件的结果</div>
+  </main>
+</div>
+
+<!-- ══════════ MODAL ══════════ -->
+<div class="modal-bg" id="modal-bg">
+  <div class="modal-inner">
+    <button class="modal-close" id="modal-close">✕</button>
+    <div class="modal">
+      <div class="modal-poster"><img id="m-img" src="" alt=""></div>
+      <div class="modal-info">
+        <div class="modal-title" id="m-title"></div>
+        <div class="modal-meta-row" id="m-meta"></div>
+        <div>
+          <div class="modal-rating" id="m-rating"></div>
+          <div class="modal-stars" id="m-stars"></div>
+        </div>
+        <div class="modal-comment" id="m-comment" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════ CONSTANTS ══════════
+const CAT_LABEL  = {movie:'电影',tv:'剧集',book:'书籍',game:'游戏',music:'音乐',performance:'演出',podcast:'Podcast'};
+const CAT_COLOR  = {movie:'#EF9F27',tv:'#1D9E75',book:'#7F77DD',game:'#639922',music:'#D4537E',performance:'#D85A30',podcast:'#378ADD'};
+const CAT_ICON   = {movie:'🎬',tv:'📺',book:'📖',game:'🎮',music:'🎵'};
+const COMPLETE_LBL={movie:'看过',tv:'看过',book:'读过',game:'玩过',music:'听过',performance:'看过',podcast:'听过'};
+const WISHLIST_LBL2={movie:'想看',tv:'想看',book:'想读',game:'想玩',music:'想听',performance:'想看',podcast:'想听'};
+
+document.addEventListener('keydown', e => { if(e.key==='Escape') document.getElementById('modal-bg').classList.remove('open'); });
+
+// ══════════ NAV ══════════
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.onclick = () => {
+    document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('page-'+tab.dataset.page).classList.add('active');
+    if(tab.dataset.page==='dashboard') initDash();
+    localStorage.setItem('lastTab', tab.dataset.page);
+  };
+});
+
+// ══════════ DASHBOARD DATA ══════════
+const DAILY = {"2013-06-22":{"book":1},"2013-08-10":{"book":1},"2016-08-20":{"book":1},"2017-01-27":{"book":3},"2018-03-29":{"book":10},"2018-12-09":{"book":1,"movie":1},"2018-12-14":{"movie":62},"2019-07-29":{"movie":5,"tv":6},"2019-07-30":{"book":1,"movie":1},"2019-09-09":{"movie":26,"music":1,"tv":4},"2019-09-10":{"movie":3,"music":2},"2020-01-18":{"movie":10,"tv":9},"2020-01-19":{"book":1,"music":1,"tv":1},"2020-01-21":{"movie":11},"2020-01-23":{"tv":1},"2020-02-06":{"book":6,"movie":2,"music":3,"tv":8},"2020-02-12":{"tv":5},"2020-02-13":{"tv":2},"2020-02-14":{"tv":1},"2020-02-15":{"movie":1,"tv":2},"2020-02-17":{"movie":1,"tv":1},"2020-02-21":{"tv":1},"2020-02-22":{"game":14,"movie":1,"music":3},"2020-02-23":{"movie":5,"music":2,"tv":1},"2020-02-24":{"movie":1},"2020-02-25":{"game":1,"movie":2},"2020-02-27":{"book":1},"2020-02-28":{"book":1,"tv":2},"2020-02-29":{"movie":2},"2020-03-02":{"music":1},"2020-03-04":{"tv":1},"2020-03-05":{"movie":1},"2020-03-06":{"movie":1},"2020-03-07":{"movie":3},"2020-03-08":{"movie":2},"2020-03-09":{"movie":3,"music":1},"2020-03-10":{"movie":1},"2020-03-12":{"book":1,"tv":1},"2020-03-15":{"music":6,"tv":1},"2020-03-19":{"music":1},"2020-03-22":{"tv":1},"2020-03-28":{"movie":1},"2020-03-30":{"tv":1},"2020-04-01":{"movie":1},"2020-04-08":{"tv":1},"2020-04-13":{"tv":1},"2020-04-17":{"tv":1},"2020-04-18":{"movie":1},"2020-04-19":{"tv":1},"2020-04-21":{"movie":1,"tv":1},"2020-04-22":{"movie":1,"tv":2},"2020-04-23":{"movie":1},"2020-04-24":{"movie":1},"2020-04-25":{"movie":1},"2020-04-26":{"movie":1,"tv":1},"2020-04-27":{"movie":1},"2020-04-28":{"tv":1},"2020-04-29":{"game":1},"2020-04-30":{"movie":1,"tv":3},"2020-05-01":{"movie":2,"tv":1},"2020-05-03":{"tv":1},"2020-05-04":{"tv":2},"2020-05-05":{"movie":3},"2020-05-07":{"tv":2},"2020-05-08":{"movie":1},"2020-05-09":{"movie":6},"2020-05-10":{"movie":1},"2020-05-11":{"movie":2},"2020-05-13":{"tv":1},"2020-05-15":{"tv":1},"2020-05-16":{"tv":1},"2020-05-17":{"book":1,"tv":1},"2020-05-19":{"movie":1},"2020-05-20":{"tv":1},"2020-05-21":{"tv":1},"2020-05-24":{"movie":1,"tv":1},"2020-05-25":{"movie":4},"2020-05-27":{"movie":2,"tv":2},"2020-05-28":{"movie":1},"2020-05-29":{"movie":3,"tv":2},"2020-05-30":{"movie":1},"2020-05-31":{"movie":1},"2020-06-02":{"movie":2,"tv":1},"2020-06-03":{"tv":1},"2020-06-09":{"tv":1},"2020-06-11":{"tv":1},"2020-06-14":{"tv":1},"2020-06-15":{"movie":1},"2020-06-16":{"tv":1},"2020-06-18":{"movie":3},"2020-06-19":{"movie":1,"tv":1},"2020-06-20":{"tv":1},"2020-06-23":{"tv":1},"2020-06-26":{"tv":1},"2020-06-27":{"movie":1,"tv":1},"2020-06-30":{"book":1,"movie":2},"2020-07-03":{"book":1},"2020-07-08":{"movie":1},"2020-07-09":{"movie":1},"2020-07-10":{"movie":1},"2020-07-11":{"movie":2},"2020-07-13":{"movie":1,"tv":1},"2020-07-14":{"movie":1,"tv":1},"2020-07-16":{"tv":1},"2020-07-25":{"tv":1},"2020-07-26":{"movie":1},"2020-07-28":{"movie":1,"tv":1},"2020-07-30":{"tv":1},"2020-08-01":{"book":1,"tv":1},"2020-08-02":{"tv":1},"2020-08-04":{"tv":1},"2020-08-06":{"tv":1},"2020-08-07":{"tv":1},"2020-08-08":{"movie":2},"2020-08-09":{"movie":3},"2020-08-15":{"tv":1},"2020-08-16":{"movie":1,"tv":2},"2020-08-17":{"tv":1},"2020-08-20":{"tv":1},"2020-08-22":{"tv":1},"2020-08-23":{"movie":2},"2020-08-24":{"tv":1},"2020-08-26":{"tv":1},"2020-08-28":{"movie":1,"tv":1},"2020-08-29":{"tv":1},"2020-08-30":{"tv":1},"2020-08-31":{"movie":1},"2020-09-03":{"movie":3,"tv":1},"2020-09-04":{"movie":2,"tv":1},"2020-09-08":{"tv":1},"2020-09-11":{"movie":2},"2020-09-12":{"movie":2},"2020-09-16":{"movie":1},"2020-09-23":{"tv":1},"2020-09-24":{"tv":1},"2020-09-30":{"movie":1},"2020-10-04":{"movie":1,"tv":2},"2020-10-05":{"movie":1},"2020-10-06":{"tv":1},"2020-10-07":{"tv":1},"2020-10-11":{"movie":2},"2020-10-13":{"movie":1},"2020-10-14":{"movie":1},"2020-10-15":{"movie":1},"2020-10-16":{"book":2,"movie":1},"2020-10-17":{"movie":1},"2020-10-20":{"movie":4},"2020-10-21":{"tv":1},"2020-10-23":{"tv":1},"2020-10-28":{"movie":2},"2020-10-29":{"movie":1},"2020-10-30":{"movie":1},"2020-11-01":{"tv":2},"2020-11-04":{"book":1},"2020-11-06":{"tv":1},"2020-11-07":{"movie":2},"2020-11-16":{"movie":1},"2020-11-17":{"book":1},"2020-11-23":{"tv":1},"2020-11-24":{"movie":2},"2020-11-25":{"tv":1},"2020-11-28":{"movie":1},"2020-12-02":{"book":1},"2020-12-05":{"movie":1},"2020-12-06":{"movie":1},"2020-12-09":{"tv":1},"2020-12-13":{"book":1},"2020-12-18":{"movie":2,"tv":1},"2020-12-20":{"movie":1},"2020-12-22":{"movie":1},"2020-12-23":{"music":1,"tv":1},"2020-12-24":{"tv":1},"2020-12-25":{"tv":1},"2020-12-26":{"movie":1,"tv":1},"2020-12-28":{"tv":1},"2020-12-30":{"tv":1},"2021-01-01":{"movie":1},"2021-01-02":{"tv":1},"2021-01-03":{"tv":1},"2021-01-09":{"tv":1},"2021-01-10":{"tv":1},"2021-01-12":{"tv":1},"2021-01-14":{"movie":1},"2021-01-15":{"movie":1,"tv":1},"2021-01-16":{"movie":1},"2021-01-17":{"movie":1,"tv":1},"2021-01-19":{"tv":1},"2021-01-20":{"tv":1},"2021-01-22":{"tv":1},"2021-01-26":{"tv":1},"2021-01-29":{"movie":1,"tv":1},"2021-01-30":{"movie":1},"2021-01-31":{"movie":1},"2021-02-02":{"tv":1},"2021-02-03":{"movie":3,"tv":1},"2021-02-04":{"tv":1},"2021-02-05":{"movie":1,"tv":1},"2021-02-07":{"movie":1,"tv":1},"2021-02-08":{"movie":1},"2021-02-10":{"tv":1},"2021-02-11":{"book":1,"tv":1},"2021-02-16":{"movie":1},"2021-02-18":{"game":1,"movie":1},"2021-02-19":{"movie":1},"2021-02-20":{"movie":1},"2021-02-22":{"movie":1},"2021-02-23":{"movie":3},"2021-02-25":{"tv":1},"2021-02-26":{"movie":3},"2021-02-27":{"movie":2,"tv":2},"2021-02-28":{"movie":1},"2021-03-02":{"movie":1,"tv":1},"2021-03-04":{"tv":1},"2021-03-05":{"tv":1},"2021-03-06":{"movie":3},"2021-03-08":{"movie":2},"2021-03-11":{"movie":1,"tv":1},"2021-03-12":{"movie":1},"2021-03-15":{"tv":1},"2021-03-21":{"movie":1,"tv":1},"2021-03-26":{"book":1,"movie":2,"tv":1},"2021-03-27":{"book":1,"movie":1},"2021-03-28":{"movie":1,"tv":1},"2021-03-29":{"movie":2,"tv":1},"2021-03-30":{"tv":1},"2021-04-01":{"movie":1},"2021-04-03":{"movie":2},"2021-04-05":{"movie":1,"tv":1},"2021-04-06":{"tv":1},"2021-04-08":{"movie":2},"2021-04-10":{"tv":1},"2021-04-20":{"tv":1},"2021-04-22":{"movie":1},"2021-04-23":{"book":1},"2021-04-26":{"tv":1},"2021-05-01":{"movie":1},"2021-05-03":{"tv":1},"2021-05-04":{"tv":1},"2021-05-08":{"tv":1},"2021-05-09":{"tv":1},"2021-05-20":{"tv":1},"2021-05-21":{"tv":1},"2021-05-22":{"movie":1},"2021-05-27":{"movie":1},"2021-05-29":{"movie":2},"2021-06-05":{"tv":1},"2021-06-12":{"tv":1},"2021-06-19":{"tv":1},"2021-06-20":{"tv":2},"2021-06-21":{"movie":1},"2021-06-22":{"movie":1},"2021-06-29":{"tv":1},"2021-06-30":{"movie":1},"2021-07-01":{"movie":1,"tv":3},"2021-07-02":{"movie":1},"2021-07-04":{"movie":1,"tv":1},"2021-07-07":{"tv":1},"2021-07-09":{"movie":1},"2021-07-10":{"movie":2},"2021-07-11":{"movie":1},"2021-07-13":{"movie":2,"tv":2},"2021-07-14":{"movie":1},"2021-07-16":{"movie":1},"2021-07-17":{"movie":2,"tv":1},"2021-07-18":{"movie":2},"2021-07-20":{"movie":2},"2021-07-22":{"movie":1},"2021-07-24":{"movie":3},"2021-07-25":{"movie":5},"2021-07-27":{"movie":1},"2021-07-28":{"movie":1},"2021-07-30":{"movie":1},"2021-07-31":{"movie":4,"tv":1},"2021-08-03":{"movie":1},"2021-08-04":{"movie":1},"2021-08-05":{"movie":2},"2021-08-07":{"movie":1},"2021-08-08":{"movie":1},"2021-08-11":{"movie":1},"2021-08-12":{"movie":1},"2021-08-13":{"movie":2},"2021-08-14":{"movie":1},"2021-08-15":{"movie":4},"2021-08-20":{"movie":2},"2021-08-21":{"movie":4},"2021-08-22":{"movie":2},"2021-08-23":{"movie":1},"2021-08-24":{"movie":1},"2021-08-25":{"movie":2},"2021-08-26":{"movie":1},"2021-08-27":{"movie":1},"2021-08-28":{"movie":3},"2021-08-29":{"movie":3},"2021-08-31":{"movie":1},"2021-09-01":{"movie":1,"tv":1},"2021-09-02":{"movie":1},"2021-09-04":{"movie":1},"2021-09-05":{"book":1,"tv":1},"2021-09-06":{"movie":1},"2021-09-07":{"movie":1},"2021-09-08":{"movie":1,"tv":1},"2021-09-10":{"movie":1},"2021-09-11":{"movie":5},"2021-09-12":{"movie":2,"tv":2},"2021-09-16":{"book":1},"2021-09-18":{"movie":2},"2021-09-19":{"tv":1},"2021-09-20":{"movie":1},"2021-09-24":{"movie":2},"2021-09-25":{"movie":1},"2021-09-30":{"movie":1,"tv":1},"2021-10-01":{"tv":1},"2021-10-03":{"movie":1},"2021-10-04":{"movie":1},"2021-10-07":{"movie":2},"2021-10-09":{"movie":3},"2021-10-10":{"movie":2},"2021-10-13":{"movie":1},"2021-10-16":{"movie":2},"2021-10-17":{"movie":2},"2021-10-19":{"movie":1},"2021-10-20":{"movie":1},"2021-10-21":{"movie":1},"2021-10-22":{"movie":1},"2021-10-23":{"movie":3},"2021-10-24":{"movie":1},"2021-10-30":{"movie":3},"2021-11-04":{"movie":1},"2021-11-05":{"movie":1},"2021-11-06":{"movie":1},"2021-11-07":{"movie":1},"2021-11-10":{"movie":2},"2021-11-14":{"movie":1},"2021-11-16":{"movie":1},"2021-11-17":{"movie":1},"2021-11-19":{"tv":1},"2021-11-21":{"movie":1},"2021-11-22":{"movie":1,"tv":1},"2021-11-23":{"movie":1},"2021-11-26":{"movie":1},"2021-11-27":{"movie":2,"tv":1},"2021-12-01":{"tv":1},"2021-12-04":{"movie":2},"2021-12-05":{"movie":1},"2021-12-07":{"movie":1},"2021-12-09":{"movie":1,"tv":1},"2021-12-10":{"movie":1},"2021-12-11":{"tv":1},"2021-12-13":{"movie":1},"2021-12-18":{"movie":1},"2021-12-19":{"movie":1},"2021-12-21":{"movie":1},"2021-12-22":{"tv":1},"2021-12-24":{"movie":2},"2021-12-26":{"movie":2},"2021-12-28":{"movie":1},"2022-01-01":{"movie":2},"2022-01-02":{"movie":2},"2022-01-03":{"movie":4},"2022-01-05":{"movie":2},"2022-01-07":{"movie":1},"2022-01-08":{"movie":3},"2022-01-09":{"movie":1},"2022-01-10":{"movie":1},"2022-01-11":{"tv":1},"2022-01-14":{"movie":1},"2022-01-15":{"movie":1},"2022-01-16":{"tv":1},"2022-01-18":{"movie":1},"2022-01-19":{"movie":1},"2022-01-22":{"movie":1},"2022-01-23":{"book":1},"2022-01-27":{"book":1},"2022-01-29":{"game":1,"movie":1},"2022-02-02":{"movie":2},"2022-02-04":{"movie":1},"2022-02-05":{"tv":1},"2022-02-07":{"movie":1},"2022-02-08":{"movie":1},"2022-02-12":{"tv":2},"2022-02-19":{"movie":2},"2022-02-20":{"book":1,"movie":1},"2022-02-21":{"book":1},"2022-02-23":{"movie":1},"2022-02-24":{"book":1},"2022-02-25":{"movie":2},"2022-03-03":{"book":2},"2022-03-05":{"tv":1},"2022-03-06":{"tv":1},"2022-03-13":{"movie":1},"2022-03-16":{"tv":1},"2022-03-19":{"movie":2},"2022-03-20":{"movie":3},"2022-03-21":{"tv":1},"2022-03-23":{"movie":1},"2022-03-24":{"movie":1},"2022-03-25":{"movie":1},"2022-03-27":{"movie":1},"2022-03-30":{"movie":1},"2022-04-01":{"movie":1,"tv":2},"2022-04-03":{"tv":1},"2022-04-04":{"movie":4},"2022-04-05":{"movie":1},"2022-04-07":{"movie":1},"2022-04-09":{"movie":1},"2022-04-12":{"tv":1},"2022-04-14":{"tv":1},"2022-04-15":{"movie":2},"2022-04-16":{"tv":1},"2022-04-17":{"movie":1},"2022-04-19":{"movie":1},"2022-04-20":{"movie":1},"2022-04-22":{"movie":1},"2022-04-29":{"tv":1},"2022-05-01":{"tv":1},"2022-05-02":{"movie":1},"2022-05-03":{"movie":1},"2022-05-05":{"movie":1},"2022-05-06":{"movie":1},"2022-05-07":{"movie":2},"2022-05-08":{"book":1,"movie":2},"2022-05-09":{"movie":4},"2022-05-10":{"book":1,"movie":2},"2022-05-11":{"movie":1},"2022-05-12":{"movie":4},"2022-05-13":{"movie":1},"2022-05-14":{"movie":1},"2022-05-15":{"movie":3},"2022-05-16":{"movie":1},"2022-05-17":{"movie":1},"2022-05-18":{"movie":1},"2022-05-20":{"movie":2},"2022-05-21":{"tv":1},"2022-05-23":{"movie":1},"2022-06-01":{"movie":1},"2022-07-04":{"movie":1},"2022-07-11":{"movie":1},"2022-07-13":{"movie":1},"2022-07-14":{"movie":1},"2022-07-15":{"movie":1},"2022-07-16":{"movie":3},"2022-07-17":{"movie":3},"2022-07-18":{"movie":1},"2022-07-28":{"movie":1},"2022-07-30":{"movie":1},"2022-08-04":{"movie":1},"2022-08-06":{"movie":1},"2022-08-07":{"movie":1},"2022-08-09":{"movie":1},"2022-08-11":{"movie":2},"2022-08-14":{"movie":1},"2022-08-15":{"movie":2},"2022-08-16":{"movie":1},"2022-08-19":{"movie":1,"tv":1},"2022-08-26":{"movie":2},"2022-08-27":{"movie":1},"2022-09-03":{"movie":2},"2022-09-09":{"movie":1},"2022-09-10":{"movie":1},"2022-09-13":{"movie":3},"2022-09-14":{"movie":1},"2022-09-30":{"movie":1},"2022-10-03":{"movie":1},"2022-10-06":{"movie":1},"2022-10-14":{"movie":2},"2022-10-15":{"movie":2},"2022-10-29":{"movie":1},"2022-10-30":{"movie":4},"2022-11-04":{"game":1},"2022-11-06":{"movie":1},"2022-11-09":{"movie":1},"2022-11-13":{"movie":1},"2022-11-20":{"tv":1},"2022-11-26":{"tv":1},"2022-11-30":{"movie":1},"2022-12-04":{"movie":1},"2022-12-05":{"movie":1},"2022-12-10":{"movie":1},"2022-12-25":{"movie":2},"2023-01-01":{"movie":2},"2023-01-02":{"movie":1},"2023-01-06":{"book":1,"movie":1},"2023-01-22":{"movie":2},"2023-02-15":{"movie":1},"2023-02-18":{"movie":2},"2023-02-27":{"movie":1},"2023-03-05":{"movie":1},"2023-04-03":{"movie":1},"2023-04-07":{"tv":1},"2023-04-30":{"game":1},"2023-05-08":{"tv":1},"2023-08-18":{"tv":1},"2023-08-23":{"movie":1},"2023-09-01":{"movie":1},"2023-09-11":{"movie":1},"2023-09-12":{"movie":1},"2023-09-28":{"game":1},"2023-11-06":{"book":1},"2023-11-07":{"movie":1},"2023-11-13":{"book":1},"2023-12-05":{"movie":1},"2023-12-26":{"movie":1},"2024-01-03":{"book":1},"2024-01-27":{"book":1},"2024-02-10":{"movie":1},"2024-02-21":{"movie":1},"2024-02-28":{"tv":1},"2024-03-12":{"tv":1},"2024-03-21":{"book":1},"2024-04-13":{"tv":1},"2024-04-21":{"tv":1},"2024-04-25":{"book":1,"tv":1},"2024-04-30":{"book":1},"2024-05-04":{"book":1,"movie":1},"2024-05-12":{"book":1},"2024-05-17":{"movie":1},"2024-05-18":{"book":1,"movie":1,"music":1},"2024-05-22":{"book":1},"2024-05-24":{"book":1},"2024-05-26":{"movie":1},"2024-05-28":{"book":1},"2024-05-30":{"tv":1},"2024-05-31":{"book":1,"movie":1},"2024-06-08":{"tv":1},"2024-06-10":{"book":1},"2024-06-14":{"movie":1},"2024-06-18":{"tv":1},"2024-06-20":{"book":1,"tv":1},"2024-06-22":{"tv":1},"2024-06-24":{"tv":1},"2024-06-25":{"tv":1},"2024-06-26":{"movie":1},"2024-06-27":{"movie":1},"2024-06-28":{"book":3,"movie":1},"2024-06-29":{"movie":1},"2024-07-01":{"movie":1},"2024-07-02":{"movie":1},"2024-07-03":{"game":1},"2024-07-07":{"movie":1},"2024-07-13":{"movie":1},"2024-07-20":{"movie":1},"2024-07-21":{"movie":1},"2024-07-25":{"book":2,"tv":1},"2024-08-05":{"tv":1},"2024-08-07":{"tv":1},"2024-08-12":{"movie":1},"2024-08-14":{"tv":1},"2024-08-16":{"movie":2},"2024-08-23":{"game":1},"2024-09-26":{"movie":1},"2024-10-06":{"movie":1,"tv":1},"2024-10-13":{"book":1,"performance":1},"2024-10-17":{"movie":1},"2024-10-18":{"game":1},"2024-11-13":{"tv":1},"2024-11-16":{"movie":2},"2024-11-20":{"book":1},"2024-11-22":{"book":1},"2024-11-24":{"game":2,"movie":1},"2024-11-28":{"movie":1,"tv":1},"2024-12-02":{"game":1},"2024-12-11":{"movie":1},"2024-12-13":{"tv":1},"2024-12-14":{"game":1},"2024-12-15":{"tv":1},"2024-12-16":{"movie":1},"2024-12-17":{"book":1},"2024-12-20":{"tv":1},"2024-12-22":{"game":1},"2024-12-26":{"tv":1},"2024-12-29":{"tv":1},"2024-12-30":{"game":2},"2024-12-31":{"tv":1},"2025-01-06":{"book":1,"movie":1},"2025-01-08":{"movie":1},"2025-01-11":{"movie":1,"tv":2},"2025-01-20":{"movie":1,"tv":2},"2025-01-26":{"podcast":1,"tv":1},"2025-01-30":{"book":1},"2025-02-08":{"tv":1},"2025-02-13":{"tv":1},"2025-02-22":{"book":1},"2025-02-24":{"game":1},"2025-02-25":{"tv":1},"2025-02-28":{"tv":1},"2025-03-03":{"movie":1},"2025-03-05":{"game":1,"tv":1},"2025-03-07":{"tv":1},"2025-03-09":{"game":1},"2025-03-10":{"tv":1},"2025-03-12":{"book":1,"movie":1,"tv":1},"2025-03-14":{"movie":1},"2025-03-15":{"game":1},"2025-03-17":{"tv":1},"2025-03-21":{"tv":1},"2025-03-22":{"game":1},"2025-03-28":{"game":1},"2025-03-31":{"tv":1},"2025-04-05":{"movie":1,"tv":1},"2025-04-06":{"book":1},"2025-04-12":{"tv":1},"2025-04-21":{"book":1},"2025-04-24":{"book":1},"2025-04-25":{"book":1},"2025-04-26":{"book":2,"game":1,"movie":1},"2025-04-30":{"game":1,"movie":1},"2025-05-01":{"book":1},"2025-05-05":{"book":2},"2025-05-08":{"book":1,"tv":1},"2025-05-11":{"book":1,"movie":1},"2025-05-18":{"game":1},"2025-05-19":{"movie":1},"2025-05-23":{"book":2},"2025-05-24":{"movie":1,"tv":1},"2025-05-25":{"tv":1},"2025-05-26":{"movie":1},"2025-05-27":{"game":2},"2025-05-28":{"book":2,"game":1},"2025-05-31":{"book":1},"2025-06-02":{"tv":1},"2025-06-03":{"movie":1},"2025-06-06":{"book":1},"2025-06-07":{"book":1,"tv":2},"2025-06-10":{"tv":1},"2025-06-15":{"book":1,"game":1},"2025-06-19":{"book":1},"2025-06-20":{"tv":1},"2025-06-22":{"book":1},"2025-06-24":{"book":3},"2025-06-27":{"game":1},"2025-06-29":{"book":2,"game":2},"2025-07-01":{"book":1},"2025-07-02":{"book":1},"2025-07-05":{"book":1,"game":2},"2025-07-11":{"book":2,"performance":1},"2025-07-12":{"book":1,"tv":1},"2025-07-14":{"book":1},"2025-07-18":{"book":1},"2025-07-21":{"book":1},"2025-07-22":{"game":1},"2025-07-26":{"movie":1},"2025-07-27":{"book":1},"2025-07-31":{"tv":1},"2025-08-03":{"book":2},"2025-08-05":{"movie":1},"2025-08-12":{"book":1},"2025-08-16":{"book":1},"2025-08-17":{"book":1,"movie":1},"2025-08-19":{"book":1},"2025-08-21":{"book":1},"2025-08-23":{"book":1},"2025-08-25":{"book":1},"2025-08-28":{"book":1,"game":1},"2025-08-30":{"book":1},"2025-08-31":{"tv":1},"2025-09-01":{"book":1},"2025-09-13":{"tv":1},"2025-09-18":{"tv":1},"2025-09-20":{"tv":1},"2025-09-24":{"book":1},"2025-10-01":{"book":1,"movie":1,"tv":1},"2025-10-11":{"tv":1},"2025-10-15":{"tv":1},"2025-10-16":{"book":1},"2025-10-26":{"book":1},"2025-10-28":{"book":1},"2025-10-31":{"book":1},"2025-11-02":{"book":1,"movie":1},"2025-11-05":{"book":1},"2025-11-12":{"book":1},"2025-11-15":{"book":1},"2025-11-20":{"tv":1},"2025-11-22":{"book":1},"2025-12-06":{"movie":1},"2025-12-07":{"book":1},"2025-12-09":{"book":2,"movie":1},"2025-12-14":{"book":1},"2025-12-17":{"movie":1},"2025-12-18":{"movie":1},"2025-12-20":{"movie":1,"tv":3},"2025-12-24":{"movie":1},"2025-12-27":{"movie":1,"tv":1},"2025-12-28":{"movie":1},"2025-12-30":{"movie":2},"2025-12-31":{"movie":1},"2026-01-03":{"movie":2},"2026-01-06":{"book":1,"movie":1},"2026-01-15":{"movie":1},"2026-01-18":{"movie":1},"2026-01-19":{"tv":1},"2026-01-28":{"book":1},"2026-01-30":{"tv":1},"2026-02-03":{"tv":1},"2026-02-05":{"book":1},"2026-02-08":{"movie":1,"music":1},"2026-02-09":{"book":1,"movie":1},"2026-02-11":{"tv":1},"2026-02-13":{"book":1},"2026-02-14":{"book":1},"2026-02-19":{"book":1},"2026-02-20":{"movie":1,"tv":1},"2026-02-22":{"movie":2},"2026-03-05":{"movie":1},"2026-03-08":{"movie":1},"2026-03-15":{"game":1,"movie":1},"2026-03-16":{"movie":2},"2026-03-17":{"movie":1},"2026-03-19":{"movie":1},"2026-03-20":{"movie":1},"2026-03-21":{"game":2},"2026-03-22":{"movie":1,"tv":1},"2026-03-23":{"movie":1},"2026-03-24":{"movie":1},"2026-03-25":{"movie":1},"2026-03-26":{"movie":1},"2026-03-27":{"movie":2},"2026-03-28":{"movie":4,"tv":1},"2026-03-29":{"movie":1}};
+const MONTHLY = {"2020-01":{"book":1,"movie":21,"music":1,"tv":11},"2020-02":{"book":8,"game":15,"movie":15,"music":8,"tv":23},"2020-03":{"book":1,"movie":12,"music":9,"tv":5},"2020-04":{"game":1,"movie":10,"tv":12},"2020-05":{"book":1,"movie":29,"tv":17},"2020-06":{"book":1,"movie":10,"tv":11},"2020-07":{"book":1,"movie":9,"tv":6},"2020-08":{"book":1,"movie":10,"tv":16},"2020-09":{"movie":11,"tv":5},"2020-10":{"book":2,"movie":17,"tv":6},"2020-11":{"book":2,"movie":6,"tv":5},"2020-12":{"book":2,"movie":7,"music":1,"tv":8},"2021-01":{"movie":8,"tv":12},"2021-02":{"book":1,"game":1,"movie":20,"tv":10},"2021-03":{"book":2,"movie":15,"tv":10},"2021-04":{"book":1,"movie":7,"tv":5},"2021-05":{"movie":5,"tv":6},"2021-06":{"movie":3,"tv":6},"2021-07":{"movie":33,"tv":9},"2021-08":{"movie":36},"2021-09":{"book":2,"movie":21,"tv":7},"2021-10":{"movie":25,"tv":1},"2021-11":{"movie":15,"tv":3},"2021-12":{"movie":15,"tv":4},"2022-01":{"book":2,"game":1,"movie":22,"tv":2},"2022-02":{"book":3,"movie":11,"tv":3},"2022-03":{"book":2,"movie":11,"tv":4},"2022-04":{"movie":14,"tv":7},"2022-05":{"book":2,"movie":30,"tv":2},"2022-06":{"movie":1},"2022-07":{"movie":14},"2022-08":{"movie":14,"tv":1},"2022-09":{"movie":9},"2022-10":{"movie":11},"2022-11":{"game":1,"movie":4,"tv":2},"2022-12":{"movie":5},"2023-01":{"book":1,"movie":6},"2023-02":{"movie":4},"2023-03":{"movie":1},"2023-04":{"game":1,"movie":1,"tv":1},"2023-05":{"tv":1},"2023-08":{"movie":1,"tv":1},"2023-09":{"game":1,"movie":3},"2023-11":{"book":2,"movie":1},"2023-12":{"movie":2},"2024-01":{"book":2},"2024-02":{"movie":2,"tv":1},"2024-03":{"book":1,"tv":1},"2024-04":{"book":2,"tv":3},"2024-05":{"book":7,"movie":5,"music":1,"tv":1},"2024-06":{"book":5,"movie":5,"tv":6},"2024-07":{"book":2,"game":1,"movie":6,"tv":1},"2024-08":{"game":1,"movie":3,"tv":3},"2024-09":{"movie":1},"2024-10":{"book":1,"game":1,"movie":2,"performance":1,"tv":1},"2024-11":{"book":2,"game":2,"movie":4,"tv":2},"2024-12":{"book":1,"game":5,"movie":2,"tv":6},"2025-01":{"book":2,"movie":4,"podcast":1,"tv":5},"2025-02":{"book":1,"game":1,"tv":4},"2025-03":{"book":1,"game":5,"movie":3,"tv":7},"2025-04":{"book":6,"game":2,"movie":3,"tv":2},"2025-05":{"book":10,"game":4,"movie":4,"tv":3},"2025-06":{"book":10,"game":4,"movie":1,"tv":5},"2025-07":{"book":10,"game":3,"movie":1,"performance":1,"tv":2},"2025-08":{"book":11,"game":1,"movie":2,"tv":1},"2025-09":{"book":2,"tv":3},"2025-10":{"book":5,"movie":1,"tv":3},"2025-11":{"book":5,"movie":1,"tv":1},"2025-12":{"book":4,"movie":11,"tv":4},"2026-01":{"book":2,"movie":5,"tv":2},"2026-02":{"book":5,"movie":5,"music":1,"tv":3},"2026-03":{"game":3,"movie":20,"tv":2}};
+const YEARLY = {2013:2,2016:1,2017:3,2018:74,2019:49,2020:337,2021:283,2022:178,2023:27,2024:90,2025:160,2026:48};
+const D_CATS = ['movie','tv','book','game','music','performance','podcast'];
+const D_LBL  = {movie:'电影',tv:'剧集',book:'书籍',game:'游戏',music:'音乐',performance:'演出',podcast:'Podcast'};
+const D_MONTHS_ZH = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+const D_MONTHS_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const D_YEARS = [2020,2021,2022,2023,2024,2025,2026];
+
+// ══════════ DASHBOARD ══════════
+let dashInited=false, dActiveYear=2026, dMonthChart=null, dYearChart=null;
+
+function initDash(){
+  if(dashInited) return;
+  dashInited=true;
+
+  const STATS_R1=[{l:'全部记录',v:1256,c:''},{l:'已完成',v:970,c:'#1D9E75'},{l:'想看',v:257,c:'#7F77DD'},{l:'已弃坑',v:21,c:'#D85A30'}];
+  const STATS_R2=[{l:'电影',v:714,c:CAT_COLOR.movie},{l:'剧集',v:304,c:CAT_COLOR.tv},{l:'书籍',v:153,c:CAT_COLOR.book},{l:'游戏',v:54,c:CAT_COLOR.game}];
+  const se=document.getElementById('d-stats');
+  [...STATS_R1,...STATS_R2].forEach(({l,v,c})=>{
+    const d=document.createElement('div'); d.className='stat';
+    if(c) d.style.borderTopColor=c;
+    d.innerHTML=`<div class="stat-label">${l}</div><div class="stat-val">${v.toLocaleString()}</div>`;
+    se.appendChild(d);
+  });
+
+  const le=document.getElementById('d-legend');
+  D_CATS.forEach(c=>{
+    const s=document.createElement('span'); s.className='legend-item';
+    s.innerHTML=`<span class="legend-dot" style="background:${CAT_COLOR[c]}"></span>${D_LBL[c]}`;
+    le.appendChild(s);
+  });
+
+  const ye=document.getElementById('d-yr-btns');
+  D_YEARS.forEach(y=>{
+    const b=document.createElement('button'); b.className='yr-btn'+(y===dActiveYear?' active':'');
+    b.textContent=y;
+    b.onclick=()=>{ document.querySelectorAll('.yr-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); dActiveYear=y; buildHM(y); buildMC(y); };
+    ye.appendChild(b);
+  });
+
+  buildHM(dActiveYear); buildMC(dActiveYear); buildYC();
+}
+
+function p2(n){return String(n).padStart(2,'0');}
+function dstr(d){return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;}
+function firstMon(year){const j=new Date(year,0,1),dow=(j.getDay()+6)%7,m=new Date(j);m.setDate(1-dow);return m;}
+
+const dTip=document.getElementById('d-tooltip');
+function buildHM(year){
+  const hm=document.getElementById('d-hm-cells'), mr=document.getElementById('d-month-row');
+  hm.innerHTML=''; mr.innerHTML='';
+  const fm=firstMon(year), mCols=new Array(53).fill('');
+  for(let w=0;w<53;w++){
+    for(let d=0;d<7;d++){
+      const dt=new Date(fm); dt.setDate(fm.getDate()+w*7+d);
+      const inY=dt.getFullYear()===year, ds=dstr(dt), data=inY?DAILY[ds]:null;
+      if(inY&&dt.getDate()===1) mCols[w]=D_MONTHS_EN[dt.getMonth()];
+      const cell=document.createElement('div');
+      cell.className='cell'+(!inY?' empty':'');
+      if(data){
+        const ent=Object.entries(data).sort((a,b)=>b[1]-a[1]);
+        const dom=ent[0][0], tot=ent.reduce((s,[,v])=>s+v,0);
+        cell.style.background=CAT_COLOR[dom]||'#888';
+        cell.style.opacity=Math.min(0.2+tot*0.18,1).toFixed(2);
+        const tip=ent.map(([k,v])=>`${D_LBL[k]||k}　${v} 条`).join('<br>');
+        cell.addEventListener('mouseenter',e=>{dTip.innerHTML=`<div style="color:#888;font-size:10px;margin-bottom:4px">${ds}</div>${tip}`;dTip.style.display='block';});
+        cell.addEventListener('mousemove',e=>{dTip.style.left=(e.clientX+14)+'px';dTip.style.top=(e.clientY-10)+'px';});
+        cell.addEventListener('mouseleave',()=>{dTip.style.display='none';});
+      }
+      hm.appendChild(cell);
+    }
+  }
+  mCols.forEach(l=>{const s=document.createElement('span');s.textContent=l;mr.appendChild(s);});
+}
+
+function buildMC(year){
+  const data=Array.from({length:12},(_,i)=>{const k=`${year}-${p2(i+1)}`;return MONTHLY[k]||{};});
+  const datasets=D_CATS.map(c=>({label:D_LBL[c],data:data.map(m=>m[c]||0),backgroundColor:CAT_COLOR[c]+'cc',borderWidth:0,borderRadius:2}));
+  if(dMonthChart) dMonthChart.destroy();
+  dMonthChart=new Chart(document.getElementById('d-month-chart'),{type:'bar',data:{labels:D_MONTHS_ZH,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{stacked:true,grid:{display:false},ticks:{color:'#666',font:{size:11}},border:{color:'transparent'}},y:{stacked:true,grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#666',font:{size:11}},border:{color:'transparent'}}}}});
+}
+
+function buildYC(){
+  const labels=Object.keys(YEARLY).map(String), vals=Object.values(YEARLY);
+  dYearChart=new Chart(document.getElementById('d-year-chart'),{type:'bar',data:{labels,datasets:[{data:vals,backgroundColor:labels.map(y=>parseInt(y)===dActiveYear?'#EF9F27cc':'#7F77DDcc'),borderWidth:0,borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#666',font:{size:11}},border:{color:'transparent'}},y:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#666',font:{size:11}},border:{color:'transparent'}}}}});
+}
+
+initDash();
+const lastTab = localStorage.getItem('lastTab');
+if(lastTab && lastTab !== 'dashboard'){
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelector(`.nav-tab[data-page="${lastTab}"]`).classList.add('active');
+  document.getElementById('page-'+lastTab).classList.add('active');
+}
+
+
+// ══════════ GALLERY + TIMELINE DATA ══════════
+let ALL=[], gFiltered=[], tFiltered=[];
+let gCat='all', gStatus='all', gSort='timestamp', gSearch='';
+let tCat='all', tStatus='all';
+let tView = 'month';
+
+async function loadData(){
+  try{
+    const r = await fetch('media_data.json?t=' + Date.now());
+    if(!r.ok) throw new Error();
+    ALL=await r.json();
+    ALL=ALL.filter(r=>['movie','tv','book','game','music','performance','podcast'].includes(r.category));
+  }catch(e){
+    ['g-empty','t-empty'].forEach(id=>{const el=document.getElementById(id);if(el){el.textContent='请先运行 fetch_posters.py 生成 media_data.json';el.style.display='block';}});
+    return;
+  }
+  applyGallery(); applyTimeline();
+}
+
+// ── Gallery ──
+function applyGallery(){
+  gFiltered=ALL.filter(r=>{
+    if(gCat!=='all'&&r.category!==gCat) return false;
+    if(gStatus!=='all'&&r.status!==gStatus) return false;
+    if(gSearch&&!r.title.toLowerCase().includes(gSearch)) return false;
+    return true;
+  });
+  gFiltered.sort((a,b)=>{
+    if(gSort==='timestamp') return (b.timestamp||'').localeCompare(a.timestamp||'');
+    if(gSort==='rating') return (b.rating||0)-(a.rating||0);
+    if(gSort==='year') return (b.year||'0').localeCompare(a.year||'0');
+    if(gSort==='title') return a.title.localeCompare(b.title,'zh');
+    return 0;
+  });
+  renderGallery();
+  document.getElementById('g-count').textContent=`${gFiltered.length.toLocaleString()} / ${ALL.length.toLocaleString()} 条`;
+}
+
+function renderGallery(){
+  const grid=document.getElementById('g-grid'), empty=document.getElementById('g-empty');
+  if(!gFiltered.length){grid.innerHTML='';empty.style.display='block';return;}
+  empty.style.display='none';
+  grid.innerHTML=gFiltered.map((r,i)=>cardHTML(r,i,'g')).join('');
+}
+
+// ── Timeline ──
+function applyTimeline(){
+  
+window.toggleYear = function(header){
+  header.closest('.tl-year').classList.toggle('collapsed');
+}
+
+window.setTView = function(v){
+  tView=v;
+  document.getElementById('tview-month').classList.toggle('active', v==='month');
+  document.getElementById('tview-day').classList.toggle('active', v==='day');
+  applyTimeline();
+}
+  tFiltered=ALL.filter(r=>{
+    if(tCat!=='all'&&r.category!==tCat) return false;
+    if(tStatus!=='all'&&r.status!==tStatus) return false;
+    return true;
+  }).sort((a,b)=>(b.timestamp||'').localeCompare(a.timestamp||''));
+
+  document.getElementById('t-count').textContent=`${tFiltered.length.toLocaleString()} 条`;
+
+  const list=document.getElementById('t-list'), empty=document.getElementById('t-empty');
+  if(!tFiltered.length){list.innerHTML='';empty.style.display='block';return;}
+  empty.style.display='none';
+
+  // group by key then by year
+  const groupKey = r => tView==='month'
+    ? (r.timestamp?r.timestamp.slice(0,7):'未知')
+    : (r.timestamp?r.timestamp.slice(0,10):'未知');
+
+  const groups={};
+  tFiltered.forEach((r,i)=>{
+    const k=groupKey(r);
+    if(!groups[k]) groups[k]=[];
+    groups[k].push({r,i});
+  });
+
+  // group keys by year
+  const byYear={};
+  Object.keys(groups).sort().reverse().forEach(k=>{
+    const yr=k.slice(0,4);
+    if(!byYear[yr]) byYear[yr]=[];
+    byYear[yr].push(k);
+  });
+
+  list.innerHTML=Object.entries(byYear).sort((a,b)=>b[0]-a[0]).map(([yr,keys])=>{
+    const totalInYear=keys.reduce((s,k)=>s+groups[k].length,0);
+    const innerHTML=keys.map(k=>{
+      const parts=k.split('-');
+      const label=tView==='month'
+        ? `${parts[0]}年${parseInt(parts[1])}月`
+        : `${parts[0]}年${parseInt(parts[1])}月${parseInt(parts[2])}日`;
+      const cards=groups[k].map(({r,i})=>cardHTML(r,i,'t')).join('');
+      return `<div class="tl-month">
+        <div class="tl-month-header">
+          <span class="tl-month-title">${label}</span>
+          <span class="tl-month-count">${groups[k].length} 条</span>
+        </div>
+        <div class="tl-row">${cards}</div>
+      </div>`;
+    }).join('');
+    return `<div class="tl-year">
+      <div class="tl-year-header" onclick="toggleYear(this)">
+        <span class="tl-year-title">${yr}</span>
+        <span class="tl-year-count">${totalInYear} 条</span>
+        <span class="tl-year-arrow">▾</span>
+      </div>
+      <div class="tl-year-body">${innerHTML}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── shared card HTML ──
+function cardHTML(r,i,prefix){
+  const col=CAT_COLOR[r.category]||'#888';
+  const ov=(r.rating||r.comment)?`<div class="poster-overlay">${r.rating?`<div class="ov-rating" style="color:${col}">${r.rating} <span style="font-size:11px;color:#aaa">/ 10</span></div>`:''
+  }${r.comment?`<div class="ov-comment">${r.comment}</div>`:''}</div>`:'';
+  const WISHLIST_LBL = {movie:'想看',tv:'想看',book:'想读',game:'想玩',music:'想听',performance:'想看',podcast:'想听'};
+const badge=r.status==='wishlist'?`<span class="badge badge-wishlist">${WISHLIST_LBL[r.category]||'想看'}</span>`:r.status==='dropped'?'<span class="badge badge-dropped">弃</span>':'';
+  const img=r.poster
+    ?`<img class="loading" src="${r.poster}" alt="${r.title}" loading="lazy" onload="this.classList.replace('loading','loaded')" onerror="this.parentNode.innerHTML='<div class=no-poster><div class=np-cat>${CAT_ICON[r.category]||'?'}</div><div>${r.title}</div></div>'">`
+    :`<div class="no-poster"><div class="np-cat">${CAT_ICON[r.category]||'?'}</div><div>${r.title}</div></div>`;
+  return `<div class="card" onclick="openModal('${prefix}',${i})">
+    <div class="poster-wrap">${img}${ov}${badge}<div class="cat-dot" style="background:${col}"></div></div>
+    <div class="card-title">${r.title}</div>
+    <div class="card-meta">${r.timestamp||r.year||''}</div>
+  </div>`;
+}
+
+// ── Modal ──
+function openModal(prefix,i){
+  const r=prefix==='g'?gFiltered[i]:tFiltered[i];
+  const col=CAT_COLOR[r.category]||'#888';
+  const statusLbl = r.status==='complete'?(COMPLETE_LBL[r.category]||'看过'):r.status==='wishlist'?(WISHLIST_LBL2[r.category]||'想看'):STATUS_LBL[r.status];
+  document.getElementById('m-img').src=r.poster||'';
+  document.getElementById('m-img').style.display=r.poster?'block':'none';
+  document.getElementById('m-title').textContent=r.title;
+  document.getElementById('m-meta').textContent=[CAT_LABEL[r.category],statusLbl,r.timestamp].filter(Boolean).join('  ·  ');
+  if(r.rating){
+    document.getElementById('m-rating').textContent=r.rating+' / 10';
+    document.getElementById('m-rating').style.color=col;
+    const f=Math.round(r.rating/2);
+    document.getElementById('m-stars').textContent='★'.repeat(f)+'☆'.repeat(5-f);
+  } else {
+    document.getElementById('m-rating').textContent='未评分';
+    document.getElementById('m-rating').style.color='var(--text3)';
+    document.getElementById('m-stars').textContent='';
+  }
+  const cm=document.getElementById('m-comment');
+  if(r.comment){cm.textContent=r.comment;cm.style.display='block';}else cm.style.display='none';
+  document.getElementById('modal-bg').classList.add('open');
+}
+
+document.getElementById('modal-close').onclick=()=>document.getElementById('modal-bg').classList.remove('open');
+document.getElementById('modal-bg').onclick=e=>{if(e.target===document.getElementById('modal-bg'))document.getElementById('modal-bg').classList.remove('open');};
+
+// ── gallery filter/sort wiring ──
+document.querySelectorAll('[data-cat]').forEach(btn=>{
+  btn.onclick=()=>{
+    const grp=btn.closest('#page-gallery')?'[data-cat]':'[data-cat]';
+    btn.closest('.filter-row').querySelectorAll('[data-cat]').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    gCat=btn.dataset.cat; applyGallery();
+  };
+});
+document.querySelectorAll('[data-status]').forEach(btn=>{
+  btn.onclick=()=>{
+    btn.closest('.filter-row').querySelectorAll('[data-status]').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    gStatus=btn.dataset.status; applyGallery();
+  };
+});
+document.querySelectorAll('[data-sort]').forEach(btn=>{
+  btn.onclick=()=>{
+    document.querySelectorAll('[data-sort]').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active'); gSort=btn.dataset.sort; applyGallery();
+  };
+});
+document.getElementById('g-search').oninput=e=>{gSearch=e.target.value.toLowerCase().trim();applyGallery();};
+
+// ── timeline filter wiring ──
+document.querySelectorAll('[data-tcat]').forEach(btn=>{
+  btn.onclick=()=>{
+    btn.closest('.filter-row').querySelectorAll('[data-tcat]').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active'); tCat=btn.dataset.tcat; applyTimeline();
+  };
+});
+document.querySelectorAll('[data-tstatus]').forEach(btn=>{
+  btn.onclick=()=>{
+    btn.closest('.filter-row').querySelectorAll('[data-tstatus]').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active'); tStatus=btn.dataset.tstatus; applyTimeline();
+  };
+});
+
+loadData();
+</script>
+<!-- ══════════ ADD PANEL ══════════ -->
+<div id="add-bg" style="position:fixed;inset:0;background:rgba(0,0,0,0.7);display:none;z-index:400;align-items:flex-start;justify-content:center;padding:60px 1rem 1rem">
+<div style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:14px;width:100%;max-width:480px;padding:1.5rem;position:relative">
+  <button onclick="closeAddPanel()" style="position:absolute;top:1rem;right:1rem;width:28px;height:28px;border-radius:50%;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text2);cursor:pointer;font-size:14px">✕</button>
+  <div style="font-size:14px;font-weight:500;margin-bottom:1rem">添加条目</div>
+
+  <!-- 类型选择 -->
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px" id="add-cats">
+    <button class="add-cat-btn active" data-c="movie">电影</button>
+    <button class="add-cat-btn" data-c="tv">剧集</button>
+    <button class="add-cat-btn" data-c="book">书籍</button>
+    <button class="add-cat-btn" data-c="game">游戏</button>
+    <button class="add-cat-btn" data-c="music">音乐</button>
+    <button class="add-cat-btn" data-c="performance">演出</button>
+    <button class="add-cat-btn" data-c="podcast">播客</button>
+  </div>
+
+  <!-- 搜索框 -->
+  <input id="add-search" type="text" placeholder="输入标题搜索…"
+    style="width:100%;background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--r);padding:8px 12px;font-size:13px;color:var(--text);font-family:inherit;outline:none;margin-bottom:8px">
+
+  <!-- 搜索结果 -->
+  <div id="add-results" style="display:none;margin-bottom:12px;max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:6px"></div>
+
+  <!-- 已选条目预览 -->
+  <div id="add-selected" style="display:none;background:var(--bg3);border-radius:var(--r);padding:10px;margin-bottom:12px;display:flex;gap:10px;align-items:center">
+    <img id="add-sel-img" src="" style="width:40px;height:60px;object-fit:cover;border-radius:4px;flex-shrink:0">
+    <div>
+      <div id="add-sel-title" style="font-size:13px;font-weight:500"></div>
+      <div id="add-sel-year" style="font-size:11px;color:var(--text2)"></div>
+    </div>
+  </div>
+
+  <!-- 状态/评分/评语 -->
+  <div id="add-form" style="display:none">
+    <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <select id="add-status" style="background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--r);padding:6px 10px;font-size:12px;color:var(--text);font-family:inherit">
+        <option value="complete">看过</option>
+        <option value="wishlist">想看</option>
+        <option value="progress">在看</option>
+        <option value="dropped">弃坑</option>
+      </select>
+      <input id="add-rating" type="number" min="1" max="10" placeholder="评分 1-10"
+        style="width:100px;background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--r);padding:6px 10px;font-size:12px;color:var(--text);font-family:inherit;outline:none">
+    </div>
+    <textarea id="add-comment" placeholder="评语（可选）" rows="3"
+      style="width:100%;background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--r);padding:8px 10px;font-size:12px;color:var(--text);font-family:inherit;outline:none;resize:vertical;margin-bottom:10px"></textarea>
+    <button onclick="submitAdd()"
+      style="width:100%;padding:8px;background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:13px;cursor:pointer;font-family:inherit">
+      确认添加
+    </button>
+    <div id="add-msg" style="font-size:12px;margin-top:8px;text-align:center"></div>
+  </div>
+</div>
+</div>
+
+<style>
+.add-cat-btn{padding:3px 10px;font-size:12px;border-radius:20px;border:0.5px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;font-family:inherit}
+.add-cat-btn.active{background:var(--bg3);color:var(--text);border-color:rgba(255,255,255,0.25)}
+.add-result-item{display:flex;gap:8px;align-items:center;padding:7px 8px;border-radius:6px;cursor:pointer;border:0.5px solid var(--border)}
+.add-result-item:hover{background:var(--bg3)}
+</style>
+
+<script>
+const ADD_SERVER = 'http://localhost:8765';
+let addCat = 'movie', addSelected = null, addSearchTimer = null;
+
+function openAddPanel(){
+  document.getElementById('add-bg').style.display='flex';
+  document.getElementById('add-search').focus();
+}
+function closeAddPanel(){
+  document.getElementById('add-bg').style.display='none';
+  resetAddPanel();
+}
+function resetAddPanel(){
+  document.getElementById('add-search').value='';
+  document.getElementById('add-results').style.display='none';
+  document.getElementById('add-results').innerHTML='';
+  document.getElementById('add-selected').style.display='none';
+  document.getElementById('add-form').style.display='none';
+  document.getElementById('add-msg').textContent='';
+  document.getElementById('add-rating').value='';
+  document.getElementById('add-comment').value='';
+  addSelected=null;
+}
+
+// 类型切换
+document.querySelectorAll('.add-cat-btn').forEach(btn=>{
+  btn.onclick=()=>{
+    document.querySelectorAll('.add-cat-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    addCat=btn.dataset.c;
+    resetAddPanel();
+  };
+});
+
+// 搜索
+document.getElementById('add-search').addEventListener('input', e=>{
+  clearTimeout(addSearchTimer);
+  const q=e.target.value.trim();
+  if(!q){document.getElementById('add-results').style.display='none';return;}
+  addSearchTimer=setTimeout(()=>doSearch(q), 400);
+});
+
+async function doSearch(q){
+  const res = document.getElementById('add-results');
+  res.innerHTML='<div style="font-size:12px;color:var(--text3);padding:6px">搜索中…</div>';
+  res.style.display='flex';
+  try{
+    const r = await fetch(`${ADD_SERVER}/api/search?q=${encodeURIComponent(q)}&cat=${addCat}`);
+    const items = await r.json();
+    if(!items.length){res.innerHTML='<div style="font-size:12px;color:var(--text3);padding:6px">无结果</div>';return;}
+    res.innerHTML=items.map((item,i)=>`
+      <div class="add-result-item" onclick="selectItem(${i})">
+        ${item.poster?`<img src="${item.poster}" style="width:30px;height:45px;object-fit:cover;border-radius:3px;flex-shrink:0">`:'<div style="width:30px;height:45px;background:var(--bg3);border-radius:3px;flex-shrink:0"></div>'}
+        <div>
+          <div style="font-size:13px">${item.title}</div>
+          <div style="font-size:11px;color:var(--text2)">${item.year||''}</div>
+        </div>
+      </div>`).join('');
+    res._items=items;
+  }catch(e){
+    res.innerHTML='<div style="font-size:12px;color:#e88a67;padding:6px">无法连接本地服务，请先启动 server.py</div>';
+  }
+}
+
+function selectItem(i){
+  const items=document.getElementById('add-results')._items;
+  addSelected=items[i];
+  document.getElementById('add-results').style.display='none';
+  document.getElementById('add-search').value='';
+  document.getElementById('add-sel-img').src=addSelected.poster||'';
+  document.getElementById('add-sel-img').style.display=addSelected.poster?'block':'none';
+  document.getElementById('add-sel-title').textContent=addSelected.title;
+  document.getElementById('add-sel-year').textContent=addSelected.year||'';
+  document.getElementById('add-selected').style.display='flex';
+  document.getElementById('add-form').style.display='block';
+}
+
+async function submitAdd(){
+  if(!addSelected)return;
+  const msg=document.getElementById('add-msg');
+  msg.textContent='提交中…'; msg.style.color='var(--text2)';
+  const payload={
+    title:    addSelected.title,
+    category: addCat,
+    status:   document.getElementById('add-status').value,
+    rating:   document.getElementById('add-rating').value||null,
+    comment:  document.getElementById('add-comment').value.trim(),
+    year:     addSelected.year||'',
+    poster:   addSelected.poster||null,
+    tmdb_id:  addSelected.id||null,
+    uuid:     addSelected.uuid||'',
+  };
+  try{
+    const r=await fetch(`${ADD_SERVER}/api/add`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const res=await r.json();
+    if(res.ok){
+      msg.textContent='✓ 已添加！'; msg.style.color='#1D9E75';
+      await loadData();
+      setTimeout(closeAddPanel, 800);
+    } else {
+      msg.textContent=res.error||'添加失败'; msg.style.color='#e88a67';
+    }
+  }catch(e){
+    msg.textContent='无法连接本地服务'; msg.style.color='#e88a67';
+  }
+}
+
+// esc 关闭
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape') closeAddPanel();
+});
+// 点背景关闭
+document.getElementById('add-bg').addEventListener('click', e=>{
+  if(e.target===document.getElementById('add-bg')) closeAddPanel();
+});
+</script>
+</body>
+</html>
