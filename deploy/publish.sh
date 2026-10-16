@@ -26,7 +26,7 @@ if [[ -L "$base/current" ]]; then previous=$(readlink -f "$base/current"); fi
 changed=0
 
 health() {
-  python3 - "$BACKEND_PORT" "$1" <<'PY'
+  "$PYTHON_BIN" - "$BACKEND_PORT" "$1" <<'PY'
 import json, sys, urllib.request
 with urllib.request.urlopen(f'http://127.0.0.1:{sys.argv[1]}/_health', timeout=5) as response:
     result = json.load(response)
@@ -63,8 +63,8 @@ for file in index.html add.js server.py fetch_posters.py RELEASE; do
   test -s "$target/$file"
 done
 [[ "$(cat "$target/RELEASE")" == "$release" ]]
-python3 -m py_compile "$target/server.py" "$target/fetch_posters.py"
-python3 -c 'import json; assert isinstance(json.load(open("/var/lib/mydbdb/media_data.json")), list)'
+"$PYTHON_BIN" -m py_compile "$target/server.py" "$target/fetch_posters.py"
+"$PYTHON_BIN" -c 'import json; assert isinstance(json.load(open("/var/lib/mydbdb/media_data.json")), list)'
 
 # Refuse a foreign listener before touching the service. A running mydbdb must
 # report the previous release; a first deployment requires a free backend port.
@@ -72,7 +72,7 @@ if systemctl is-active --quiet mydbdb.service; then
   test -n "$previous"
   health "$(cat "$previous/RELEASE")"
 else
-  python3 - "$BACKEND_PORT" <<'PY'
+  "$PYTHON_BIN" - "$BACKEND_PORT" <<'PY'
 import socket, sys
 with socket.socket() as s:
     s.bind(('127.0.0.1', int(sys.argv[1])))

@@ -4,12 +4,14 @@ set -Eeuo pipefail
 umask 077
 port="${1:-18443}"
 backend="${2:-18081}"
+python_bin="${3:-/usr/bin/python3}"
+[[ "$python_bin" =~ ^/[A-Za-z0-9_./-]+$ && -x "$python_bin" ]]
 [[ "$port" =~ ^[0-9]{4,5}$ && "$backend" =~ ^[0-9]{4,5}$ ]]
 (( port >= 1024 && port <= 65535 && backend >= 1024 && backend <= 65535 && port != backend ))
 [[ $(id -u) == 0 ]] || { echo 'Run in the server administrator terminal as root.' >&2; exit 1; }
-for command in nginx python3 curl openssl systemctl visudo ss flock; do command -v "$command" >/dev/null; done
+for command in nginx curl openssl systemctl visudo ss flock; do command -v "$command" >/dev/null; done
 id ledger-deploy >/dev/null
-python3 -c 'import sys; assert sys.version_info >= (3, 10), "Python 3.10+ required"'
+"$python_bin" -c 'import sys; assert sys.version_info >= (3, 10), "Python 3.10+ required; pass its absolute path as argument 3"'
 nginx -t
 systemctl is-active --quiet nginx
 cert=/etc/nginx/ssl/8.148.157.132/fullchain.pem
@@ -27,7 +29,7 @@ grep -Eq 'include[[:space:]]+/etc/nginx/conf.d/\*\.conf;' <<< "$config" || {
 if grep -Eq "listen[[:space:]]+([^;[:space:]]*:)?($port|$backend)([;[:space:]])" <<< "$config"; then
   echo 'Requested port already appears in Nginx configuration. Nothing changed.' >&2; exit 1
 fi
-python3 - "$port" "$backend" <<'PY'
+"$python_bin" - "$port" "$backend" <<'PY'
 import socket, sys
 for port in map(int, sys.argv[1:]):
     with socket.socket() as s:
@@ -57,7 +59,7 @@ printf 'owner:%s\n' "$password_hash" > /etc/mydbdb/htpasswd
 unset password_hash
 chown "root:$nginx_group" /etc/mydbdb/htpasswd
 chmod 640 /etc/mydbdb/htpasswd
-printf 'PUBLIC_PORT=%s\nBACKEND_PORT=%s\n' "$port" "$backend" > /etc/mydbdb/deploy.conf
+printf 'PUBLIC_PORT=%s\nBACKEND_PORT=%s\nPYTHON_BIN=%s\n' "$port" "$backend" "$python_bin" > /etc/mydbdb/deploy.conf
 chmod 644 /etc/mydbdb/deploy.conf
 
 cat > /etc/systemd/system/mydbdb.service <<UNIT
@@ -72,7 +74,7 @@ Type=simple
 User=ledger-deploy
 Group=ledger-deploy
 WorkingDirectory=/opt/mydbdb/current
-ExecStart=/usr/bin/python3 /opt/mydbdb/current/server.py --port $backend --state-dir /var/lib/mydbdb --public-origin https://8.148.157.132:$port
+ExecStart=$python_bin /opt/mydbdb/current/server.py --port $backend --state-dir /var/lib/mydbdb --public-origin https://8.148.157.132:$port
 Restart=on-failure
 RestartSec=3
 UMask=0077

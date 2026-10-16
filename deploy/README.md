@@ -15,6 +15,21 @@ sudo bash /tmp/mydbdb-setup.sh 18443 18081
 
 安装需要现有 Nginx、Python 3.10+、OpenSSL、curl、systemd、sudo、flock，并复用服务器已有的 IP 证书 `/etc/nginx/ssl/8.148.157.132/`。脚本不安装系统包、不变更证书续期、不覆盖已有文件。运行时设置网站密码，不要使用 NeoDB 密码。
 
+当前服务器的系统 Python 是 3.6。Alibaba Cloud Linux 3 可并行安装 Python 3.11，并作为第三个参数指定，**不替换系统 Python，不修改已有应用环境**：
+
+```bash
+sudo dnf install -y python3.11
+sudo bash /tmp/mydbdb-setup.sh 18443 18081 /usr/bin/python3.11
+```
+
+如果服务器无法连接 `raw.githubusercontent.com`，在本机通过已授权的 SSH 上传脚本，不需要在服务器重试下载或关闭 TLS 校验：
+
+```powershell
+scp -i <部署私钥路径> -o StrictHostKeyChecking=yes deploy/setup.sh ledger-deploy@8.148.157.132:/home/ledger-deploy/mydbdb-setup.sh
+```
+
+然后在服务器管理员终端运行 `sudo bash /home/ledger-deploy/mydbdb-setup.sh 18443 18081 /usr/bin/python3.11`。服务启动、发布检查都使用指定解释器。
+
 脚本新增 `/etc/nginx/conf.d/mydbdb.conf`，检查配置后平滑重载 Nginx；不改现有 `80`、`443`、`8088` 站点配置。后续 Actions 不再修改或重载 Nginx。
 
 将本项目部署公钥添加到 `ledger-deploy` 的 `authorized_keys`，保留已有公钥，并加 `restrict` 前缀。该用户新增的 sudo 权限只有：
@@ -79,4 +94,4 @@ systemctl restart mydbdb.service
 curl --fail http://127.0.0.1:18081/_health
 ```
 
-参考：[GitHub Actions Secrets](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets)、[Nginx HTTP Basic Authentication](https://nginx.org/en/docs/http/ngx_http_auth_basic_module.html)。
+参考：[GitHub Actions Secrets](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets)、[Nginx HTTP Basic Authentication](https://nginx.org/en/docs/http/ngx_http_auth_basic_module.html)、[阿里云并行安装 Python 3.11](https://www.alibabacloud.com/help/en/alinux/support/install-a-newer-python-3-on-alibaba-cloud-linux-3)。
