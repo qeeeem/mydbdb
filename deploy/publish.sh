@@ -17,6 +17,7 @@ target="$base/releases/$release"
 test -s "$archive"
 test ! -e "$target"
 test -s /var/lib/mydbdb/media_data.json
+test -s /var/lib/mydbdb/import-owner.json
 exec 9>"$state/deploy.lock"
 flock -w 120 9
 previous=
@@ -57,13 +58,14 @@ trap 'exit 130' INT
 trap 'exit 143' TERM HUP
 
 mkdir "$target"
-# Extract only the five files produced by this workflow, never paths from an archive.
-for file in index.html add.js server.py fetch_posters.py RELEASE; do
+mkdir "$target/vendor"
+# Extract only explicit code files, never paths supplied by an archive.
+for file in index.html add.js server.py fetch_posters.py data_tools.py vendor/fflate.js vendor/fflate.LICENSE RELEASE; do
   tar -xOzf "$archive" "$file" > "$target/$file"
   test -s "$target/$file"
 done
 [[ "$(cat "$target/RELEASE")" == "$release" ]]
-"$PYTHON_BIN" -m py_compile "$target/server.py" "$target/fetch_posters.py"
+"$PYTHON_BIN" -m py_compile "$target/server.py" "$target/fetch_posters.py" "$target/data_tools.py"
 "$PYTHON_BIN" -c 'import json; assert isinstance(json.load(open("/var/lib/mydbdb/media_data.json")), list)'
 
 # Refuse a foreign listener before touching the service. A running mydbdb must
@@ -90,17 +92,23 @@ for _attempt in {1..15}; do
 done
 (( healthy == 1 )) || { echo 'New release health check failed.' >&2; exit 1; }
 
-# No admin password in CI: check public reading and the protected API boundary.
+# No password in CI: require authentication for the page, data and every API.
 # Connecting locally works even before the cloud firewall opens the public port.
-for path in / /index.html /add.js /media_data.json /api/session /api/search /api/mark /api/connect /api/add; do
-  expected=200
-  if [[ "$path" == /api/* ]]; then expected=401; fi
+for path in / /index.html /add.js /media_data.json /api/data /api/import/library.js /api/import/start /api/import/chunk /api/import/finish /api/data/commit /api/data/cancel; do
+  expected=401
   status=$(curl --silent --show-error --connect-timeout 5 --max-time 10 \
     --connect-to "8.148.157.132:$PUBLIC_PORT:127.0.0.1:$PUBLIC_PORT" \
     -o /dev/null -w '%{http_code}' "https://8.148.157.132:$PUBLIC_PORT$path")
   [[ "$status" == "$expected" ]] || { echo "HTTPS access check failed: $path ($status; expected $expected)" >&2; exit 1; }
 done
+for path in /api/import/start /api/import/chunk /api/import/finish /api/data/commit /api/data/cancel; do
+  status=$(curl --silent --show-error --connect-timeout 5 --max-time 10 \
+    --connect-to "8.148.157.132:$PUBLIC_PORT:127.0.0.1:$PUBLIC_PORT" \
+    -H 'Content-Type: application/json' --data '{}' -o /dev/null -w '%{http_code}' \
+    "https://8.148.157.132:$PUBLIC_PORT$path")
+  [[ "$status" == 401 ]] || { echo "Unauthenticated write was not rejected: $path ($status)" >&2; exit 1; }
+done
 printf '%s\n' "$release" > "$state/current-release"
 changed=0
 rm -f -- "$archive"
-echo "Deployed $release; persistent data and NeoDB credentials retained."
+echo "Deployed $release; persistent data and private configuration retained."

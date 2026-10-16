@@ -43,7 +43,7 @@ nginx_user=$(awk '$1 == "user" {gsub(";", "", $2); print $2; exit}' <<< "$config
 test -n "$nginx_user"
 nginx_group=$(id -gn "$nginx_user")
 
-echo 'Browsing is public. Set an admin password ONLY for adding entries and syncing NeoDB (user: owner).'
+echo 'Set the website login password (user: owner). Required for browsing and importing.'
 read -rs -p 'Admin password (at least 12 characters): ' password </dev/tty; echo
 read -rs -p 'Repeat password: ' confirm </dev/tty; echo
 [[ ${#password} -ge 12 && "$password" == "$confirm" ]] || { echo 'Passwords differ or are too short.' >&2; exit 1; }
@@ -115,12 +115,6 @@ server {
     proxy_hide_header WWW-Authenticate;
 
     location = /_health { return 404; }
-    # Only the read-only page, script and collection are public. All APIs retain
-    # the admin check, including session/CSRF and NeoDB account connection.
-    location ~ ^/(index\\.html|add\\.js|media_data\\.json)?\$ {
-        auth_basic off;
-        proxy_pass http://127.0.0.1:$backend;
-    }
     location / {
         proxy_pass http://127.0.0.1:$backend;
     }
@@ -136,5 +130,5 @@ if ! nginx -t || ! systemctl reload nginx; then
 fi
 systemctl daemon-reload
 systemctl enable mydbdb.service
-echo "Setup ready: https://8.148.157.132:$port (public browsing; admin: owner). Open TCP $port only."
-echo 'Next: authorize the deployment SSH public key, upload initial media_data.json, then run Deploy mydbdb.'
+echo "Setup ready: https://8.148.157.132:$port (password required; user: owner). Open TCP $port only."
+echo 'Next: authorize the deployment SSH public key, upload media_data.json and private import-owner.json, then run Deploy mydbdb.'

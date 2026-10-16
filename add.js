@@ -1,200 +1,127 @@
-// Existing add-entry panel; all requests use the local page's origin.
-let addCat='movie', addSelected=null, addSearchTimer=null;
-let addSession=null, addBusy=false, addReady=false, addSaved=false;
-let addSearchVersion=0, addSelectionVersion=0;
-
-function addMessage(text, error=false){
-  const msg=document.getElementById('add-msg');
-  msg.textContent=text;
-  msg.style.color=error?'#e88a67':'var(--text2)';
-}
-
-async function addRequest(path, payload){
-  const options=payload===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json','X-Mydbdb-CSRF':addSession?.csrf||''},body:JSON.stringify(payload)};
+async function dataRequest(path,payload){
+  const options=payload===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json','X-Mydbdb-CSRF':dataState?.csrf||''},body:JSON.stringify(payload)};
   let response;
-  try { response=await fetch(path, options); }
-  catch(e){ throw new Error('无法连接本地服务，请运行 python server.py 后打开服务地址'); }
-  let data;
-  try { data=await response.json(); }
-  catch(e){
-    if(response.status===401) throw new Error('添加条目需要管理员验证，请重新打开添加窗口');
-    throw new Error('添加服务未返回有效数据，请稍后重试');
+  try{response=await fetch(path,options);}
+  catch{throw new Error('无法连接网站服务，请检查网络后重试');}
+  let result;
+  try{result=await response.json();}
+  catch{throw new Error(response.status===401||response.status===403?'已拒绝':'服务返回异常，请稍后重试');}
+  if(!response.ok)throw new Error(response.status===401||response.status===403?'已拒绝':result.error||'请求失败');
+  return result;
+}
+
+// Collection import. The reverse proxy authenticates every /api/ request.
+let dataState=null, dataBusy=false, dataOpen=false, dataPoll=null, zipLibrary=null;
+function dataMessage(text,error=false){
+  const el=document.getElementById('data-msg');el.textContent=text;el.style.color=error?'#e88a67':'var(--text2)';
+}
+function dataControls(){
+  const job=dataState?.job, active=['uploading','running','ready'].includes(job?.state);
+  ['data-import','data-file','data-choose'].forEach(id=>{document.getElementById(id).disabled=dataBusy||active||!dataState;});
+  document.getElementById('data-commit').disabled=dataBusy||job?.state!=='ready';
+  document.getElementById('data-cancel').hidden=!active;
+  document.getElementById('data-cancel').disabled=dataBusy;
+}
+function renderDataState(state){
+  dataState=state;document.getElementById('data-import-area').hidden=false;
+  document.getElementById('data-count').textContent=`本站收藏：${state.count} 条`;
+  const job=state.job;
+  document.getElementById('data-preview').hidden=job?.state!=='ready';
+  if(job?.state==='ready'){
+    const p=job.preview;
+    document.getElementById('data-preview-count').textContent=`更新为 ${p.total} 条：新增 ${p.added}，修改 ${p.updated}，移除 ${p.removed}`;
   }
-  if(!response.ok){
-    if(response.status===401){
-      if(addSession)addSession.connected=false;
-      document.getElementById('add-auth').style.display='block';
-      document.getElementById('add-account').textContent='';
-      updateAddControls();
+  if(job)dataMessage(job.message,job.state==='error');
+  dataControls();
+}
+async function refreshDataStatus(){
+  clearTimeout(dataPoll);
+  const state=await dataRequest('/api/data');
+  renderDataState(state);
+  if(dataOpen&&['running','uploading'].includes(state.job?.state))dataPoll=setTimeout(()=>refreshDataStatus().catch(e=>dataMessage(e.message,true)),1200);
+  return state;
+}
+async function openDataPanel(){
+  dataOpen=true;dataState=null;document.getElementById('data-import-area').hidden=true;
+  document.getElementById('data-preview').hidden=true;document.getElementById('data-bg').style.display='flex';dataMessage('正在读取数据…');
+  dataBusy=true;dataControls();
+  try{const state=await refreshDataStatus();if(!state.job)dataMessage('');}
+  catch(e){dataMessage(e.message,true);}
+  finally{dataBusy=false;dataControls();}
+}
+function closeDataPanel(){
+  if(dataBusy)return;
+  dataOpen=false;clearTimeout(dataPoll);document.getElementById('data-bg').style.display='none';
+}
+function loadZipLibrary(){
+  if(!zipLibrary)zipLibrary=new Promise((resolve,reject)=>{
+    const script=document.createElement('script');script.src='/api/import/library.js';
+    script.onload=()=>resolve(globalThis.fflate);
+    script.onerror=()=>{zipLibrary=null;reject(new Error('ZIP 组件加载失败，请重新打开数据管理'));};
+    document.head.appendChild(script);
+  });
+  return zipLibrary;
+}
+function collectionZip(bytes,zip){
+  const names=new Set(),wanted=new Set(['catalog.ndjson','journal.ndjson']);let expanded=0;
+  const files=zip.unzipSync(bytes,{filter:entry=>{
+    if(!wanted.has(entry.name))return false;
+    if(names.has(entry.name))throw new Error('ZIP 中的收藏文件重复');
+    names.add(entry.name);expanded+=entry.originalSize;
+    if(!Number.isSafeInteger(expanded)||expanded>96*1024*1024)throw new Error('解压后的收藏数据超过 96 MiB');
+    return true;
+  }});
+  if(names.size!==2)throw new Error('请选择包含 catalog.ndjson 和 journal.ndjson 的 NeoDB 导出包');
+  // Never decompress or transmit actor.ndjson, attachments or account keys.
+  return zip.zipSync(files,{level:1});
+}
+async function importDataZip(){
+  if(dataBusy)return;
+  const files=document.getElementById('data-file').files;
+  if(!files?.length){dataMessage('未选择 ZIP，当前数据保持不变');return;}
+  if(files.length!==1){dataMessage('请只选择一个 ZIP',true);return;}
+  if(files[0].size>64*1024*1024){dataMessage('ZIP 超过 64 MiB',true);return;}
+  dataBusy=true;dataControls();dataMessage('正在读取 ZIP…');
+  let id=null;
+  try{
+    if(!dataState)await refreshDataStatus();
+    const bytes=new Uint8Array(await files[0].arrayBuffer());
+    const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),v=>v.toString(16).padStart(2,'0')).join('');
+    const result=await dataRequest('/api/import/start',{sha256:hash});
+    if(result.unchanged){dataMessage(result.message);return;}
+    id=result.id;
+    const packed=collectionZip(bytes,await loadZipLibrary());
+    for(let offset=0;offset<packed.length;offset+=32768){
+      const chunk=packed.subarray(offset,offset+32768);
+      await dataRequest('/api/import/chunk',{id,offset,data:btoa(String.fromCharCode(...chunk))});
+      dataMessage(`正在上传收藏数据：${Math.min(100,Math.round((offset+chunk.length)/packed.length*100))}%`);
     }
-    throw new Error(data.error||'请求失败，请重试');
-  }
-  return data;
+    await dataRequest('/api/import/finish',{id});await refreshDataStatus();
+  }catch(e){
+    if(id){try{await dataRequest('/api/data/cancel',{id});}catch{ /* Reopen to cancel a surviving upload. */ }}
+    dataMessage(e.message,true);
+  }finally{dataBusy=false;dataControls();}
 }
-
-function updateAddControls(){
-  document.querySelectorAll('#add-bg input, #add-bg textarea, #add-bg select, #add-bg button').forEach(el=>{el.disabled=addBusy;});
-  document.getElementById('add-submit').disabled=addBusy||!addSession?.connected||!addReady||addSaved;
+async function cancelData(){
+  if(dataBusy||!dataState?.job)return;
+  dataBusy=true;dataControls();clearTimeout(dataPoll);
+  try{await dataRequest('/api/data/cancel',{id:dataState.job.id});await refreshDataStatus();dataMessage('已取消，当前数据保持不变');}
+  catch(e){dataMessage(e.message,true);}
+  finally{dataBusy=false;dataControls();}
 }
-
-async function openAddPanel(){
-  document.getElementById('add-bg').style.display='flex';
-  document.getElementById('add-search').focus();
-  updateAddControls();
+async function commitData(){
+  if(dataBusy||dataState?.job?.state!=='ready')return;
+  dataBusy=true;dataControls();let saved=false;
   try{
-    addSession=await addRequest('/api/session');
-    document.getElementById('add-auth').style.display=addSession.connected?'none':'block';
-    document.getElementById('add-account').textContent=addSession.connected?`已连接 ${addSession.username}`:'';
-    if(addSession.error) addMessage(addSession.error,true);
-  }catch(e){ addSession=null; addMessage(e.message,true); }
-  updateAddControls();
+    const result=await dataRequest('/api/data/commit',{id:dataState.job.id});saved=true;
+    await refreshDataStatus();
+    if(await loadData()===false)throw new Error('页面刷新失败');
+    document.getElementById('data-file').value='';document.getElementById('data-filename').textContent='未选择文件';dataMessage(result.message);
+  }catch(e){dataMessage(saved?'收藏已保存，请刷新页面查看':e.message,true);}
+  finally{dataBusy=false;dataControls();}
 }
-
-async function connectNeoDB(){
-  if(addBusy)return;
-  const input=document.getElementById('add-token');
-  const token=input.value.trim();
-  if(!token){addMessage('请粘贴 NeoDB 访问令牌',true);return;}
-  addBusy=true; updateAddControls(); addMessage('正在连接 NeoDB…');
-  try{
-    if(!addSession) addSession=await addRequest('/api/session');
-    const result=await addRequest('/api/connect',{token});
-    addSession.connected=true; addSession.username=result.username;
-    input.value='';
-    document.getElementById('add-auth').style.display='none';
-    document.getElementById('add-account').textContent=`已连接 ${result.username}`;
-    addMessage('已连接 NeoDB');
-    if(addSelected&&!addReady) await loadSelectedMark();
-  }catch(e){addMessage(e.message,true);}
-  finally{addBusy=false;updateAddControls();}
-}
-
-function closeAddPanel(){
-  if(addBusy)return;
-  document.getElementById('add-bg').style.display='none';
-  document.getElementById('add-token').value='';
-  resetAddPanel();
-}
-
-function resetAddPanel(){
-  clearTimeout(addSearchTimer); addSearchVersion++; addSelectionVersion++;
-  document.getElementById('add-search').value='';
-  const results=document.getElementById('add-results');
-  results.style.display='none'; results.innerHTML=''; results._items=[];
-  document.getElementById('add-selected').style.display='none';
-  document.getElementById('add-form').style.display='none';
-  document.getElementById('add-rating').value='';
-  document.getElementById('add-comment').value='';
-  document.getElementById('add-visibility').value='2';
-  addSelected=null;addReady=false;addSaved=false;addMessage('');
-  updateAddControls();
-}
-
-document.querySelectorAll('.add-cat-btn').forEach(btn=>{
-  btn.onclick=()=>{
-    if(addBusy)return;
-    document.querySelectorAll('.add-cat-btn').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active'); addCat=btn.dataset.c; resetAddPanel();
-  };
-});
-
-document.getElementById('add-search').addEventListener('input',e=>{
-  clearTimeout(addSearchTimer);
-  const version=++addSearchVersion, q=e.target.value.trim();
-  const results=document.getElementById('add-results');
-  results._items=[]; results.innerHTML='';
-  if(!q){results.style.display='none';return;}
-  addSearchTimer=setTimeout(()=>doSearch(q,version),400);
-});
-
-async function doSearch(q,version=++addSearchVersion){
-  const res=document.getElementById('add-results'), category=addCat;
-  res.textContent='搜索中…'; res.style.display='flex'; res._items=[];
-  try{
-    const items=await addRequest(`/api/search?q=${encodeURIComponent(q)}&cat=${category}`);
-    if(version!==addSearchVersion||category!==addCat)return;
-    res.innerHTML=''; res._items=items;
-    if(!items.length){res.textContent='没有找到条目';return;}
-    items.forEach((item,i)=>{
-      const button=document.createElement('button');
-      button.type='button'; button.className='add-result-item'; button.onclick=()=>selectItem(i);
-      if(item.poster){
-        const img=document.createElement('img'); img.src=item.poster; img.alt=''; button.appendChild(img);
-      }
-      const info=document.createElement('div');
-      const title=document.createElement('div'); title.textContent=item.title; info.appendChild(title);
-      if(item.year){const year=document.createElement('div');year.className='add-result-year';year.textContent=item.year;info.appendChild(year);}
-      button.appendChild(info);res.appendChild(button);
-    });
-  }catch(e){if(version===addSearchVersion)res.textContent=e.message;}
-}
-
-async function selectItem(i){
-  if(addBusy)return;
-  const item=document.getElementById('add-results')._items[i];
-  if(!item)return;
-  clearTimeout(addSearchTimer); addSearchVersion++;
-  addSelected=item; addReady=false; addSaved=false;
-  document.getElementById('add-results').style.display='none';
-  document.getElementById('add-search').value='';
-  document.getElementById('add-sel-img').src=item.poster||'';
-  document.getElementById('add-sel-img').style.display=item.poster?'block':'none';
-  document.getElementById('add-sel-title').textContent=item.title;
-  document.getElementById('add-sel-year').textContent=item.year||'';
-  document.getElementById('add-selected').style.display='flex';
-  document.getElementById('add-form').style.display='none';
-  if(!addSession?.connected){addMessage('请先连接 NeoDB，再确认添加',true);updateAddControls();return;}
-  await loadSelectedMark();
-}
-
-async function loadSelectedMark(){
-  const item=addSelected, version=++addSelectionVersion;
-  addReady=false; updateAddControls(); addMessage('正在读取 NeoDB 收藏状态…');
-  try{
-    const result=await addRequest(`/api/mark?uuid=${encodeURIComponent(item.uuid)}`);
-    if(version!==addSelectionVersion||item!==addSelected)return;
-    if(result.item){
-      Object.assign(item,result.item);
-      document.getElementById('add-sel-title').textContent=item.title;
-      document.getElementById('add-sel-year').textContent=item.year||'';
-    }
-    const mark=result.mark;
-    const verbs={book:['读过','想读','在读'],game:['玩过','想玩','在玩'],music:['听过','想听','在听'],podcast:['听过','想听','在听']}[item.category]||['看过','想看','在看'];
-    const status=document.getElementById('add-status');
-    ['complete','wishlist','progress'].forEach((value,i)=>{status.querySelector(`option[value="${value}"]`).textContent=verbs[i];});
-    status.value=mark?.shelf_type||'complete';
-    document.getElementById('add-rating').value=mark?.rating_grade??'';
-    document.getElementById('add-comment').value=mark?.comment_text||'';
-    document.getElementById('add-visibility').value=String(mark?.visibility??2);
-    document.getElementById('add-submit').textContent=mark?'更新并同步 NeoDB':'添加并同步 NeoDB';
-    document.getElementById('add-form').style.display='block';
-    addReady=true; addMessage('');
-  }catch(e){if(version===addSelectionVersion)addMessage(e.message,true);}
-  updateAddControls();
-}
-
-async function submitAdd(){
-  if(addBusy||!addSelected||!addReady||!addSession?.connected||addSaved)return;
-  const value=document.getElementById('add-rating').value;
-  const rating=value===''?null:Number(value);
-  if(rating!==null&&(!Number.isInteger(rating)||rating<1||rating>10)){addMessage('评分请输入 1–10 的整数，或留空',true);return;}
-  const payload={uuid:addSelected.uuid,status:document.getElementById('add-status').value,rating,
-    comment:document.getElementById('add-comment').value,visibility:Number(document.getElementById('add-visibility').value)};
-  addBusy=true;updateAddControls();addMessage('正在同步 NeoDB…');
-  let synced=false;
-  try{
-    const result=await addRequest('/api/add',payload);
-    if(!result.ok||!result.synced)throw new Error(result.error||'未确认同步成功，请重试');
-    synced=true; addSaved=true;
-    const loaded=await loadData();
-    if(loaded===false)throw new Error('页面数据读取失败');
-    addMessage('已保存并同步 NeoDB');
-  }catch(e){addMessage(synced?'已同步 NeoDB 并保存本地，请刷新页面查看':e.message,true);}
-  finally{addBusy=false;updateAddControls();}
-}
-
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAddPanel();});
-document.getElementById('add-bg').addEventListener('click',e=>{if(e.target===document.getElementById('add-bg'))closeAddPanel();});
-document.getElementById('add-form').addEventListener('input',()=>{
-  if(!addBusy){addSaved=false;updateAddControls();}
+document.getElementById('data-bg').addEventListener('click',e=>{if(e.target===document.getElementById('data-bg'))closeDataPanel();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&dataOpen)closeDataPanel();});
+document.getElementById('data-file').addEventListener('change',e=>{
+  document.getElementById('data-filename').textContent=e.target.files[0]?'已选择 ZIP':'未选择文件';
 });

@@ -1,5 +1,24 @@
 # 我的书影音
 
+## 在页面导入 ZIP
+
+访问网站时先使用 `owner` 和网站密码登录，再点击右上角「数据管理」。首页、收藏数据和导入接口均受密码保护。
+
+整站共用同一次登录，浏览器保留登录信息期间，切换页面、预览和确认导入无需重复输入密码。
+
+上传先通过管理员身份验证，再由后端按私有配置核验导出归属。允许导入的账号不写入前端、接口响应或仓库；不符合权限时只显示「已拒绝」。
+
+- **ZIP 导入**：选择一个 NeoDB NDJSON 导出 ZIP，点击「预览导入」。未选文件或与上次网页成功导入的 ZIP 的 SHA-256 相同，数据不变。新 ZIP 显示新增、修改、移除及总数，点击「确认更新本站」才替换收藏。
+- **取消或失败**：不改变现有收藏。预览后若收藏数据已变化，需要取消并重新导入，避免覆盖新记录。
+
+ZIP 上限 64 MiB，所需文件解压后合计不超过 96 MiB。浏览器只读取并上传 `catalog.ndjson` 和 `journal.ndjson`；不解压或上传含私钥的 `actor.ndjson` 和附件。服务器再次验证导出账号和收藏记录归属。原始 ZIP 不保存到服务器。
+
+确认更新前自动备份当前数据到状态目录的 `backups/`；本地为 `../.mydbdb-local/backups/`，部署后为 `/var/lib/mydbdb/backups/`。网页导入哈希保存在同目录 `web-import.json`，与下文命令行的哈希记录独立。预览在内存中保留 30 分钟；重启服务后需重新预览，已保存的收藏不受影响。
+
+导入包含全部收藏及短评，包括 NeoDB 上设为非公开的收藏。网站需要密码才能查看；确认导入前请核对预览。
+
+网页 ZIP 导入不需要 NeoDB 令牌，也不依赖服务器连接 NeoDB。ZIP 组件使用随代码部署的 [fflate 0.8.3](https://github.com/101arrowz/fflate)，许可证见 `vendor/fflate.LICENSE`，无需第三方 CDN。
+
 ## 从 NeoDB 导出包更新收藏
 
 将 NeoDB 导出的 ZIP 放进 `data/` 文件夹（不用解压），然后在项目目录运行：
@@ -22,13 +41,13 @@ python fetch_posters.py
 默认复用现有 JSON 中的海报链接，新增条目使用导出包的 `cover_image_url`。解析过程不联网、不需要 API 密钥，也不下载图片；浏览器显示封面仍需网络。完全重新使用 NeoDB 封面：
 
 ```powershell
-python fetch_posters.py data/neodb_AriVo_20261015093734_ndjson.zip --no-poster-cache
+python fetch_posters.py data/export.zip --no-poster-cache
 ```
 
 显式指定 ZIP 路径会直接解析，不受哈希检查限制，也不修改自动检查的哈希记录。另存结果而不覆盖页面数据：
 
 ```powershell
-python fetch_posters.py data/neodb_AriVo_20261015093734_ndjson.zip -o preview.json --poster-cache media_data.json
+python fetch_posters.py data/export.zip -o preview.json --poster-cache media_data.json
 ```
 
 ## 本地打开页面
@@ -43,23 +62,15 @@ python server.py
 
 统计页从同一份 JSON 汇总全部记录的分类、状态，以及按标记日期分组的每日、月度和年度数量。年份选项随数据生成，首次加载默认显示最新记录所在年份。没有日期的记录计入总数，但不计入日期图表。
 
+首次本地导入前，由管理员使用可信导出包配置导入权限：
+
+```powershell
+python server.py --set-import-owner data/export.zip
+```
+
+配置写入网站目录之外的 `../.mydbdb-local/import-owner.json`，不是从网页上传内容自动绑定。配置缺失时拒绝导入。本地服务仅允许本机访问；公网部署由 Nginx 验证网站密码，页面、数据和所有导入接口（包括分片及确认）都在验证之后开放。
+
 端口被占用时可运行 `python server.py --port 8001`，并打开对应端口。服务只监听本机，不使用旧 ngrok 地址；只提供页面、脚本和展示数据，不提供 ZIP、账号配置或目录列表。
-
-## 用现有「＋ 添加条目」同步 NeoDB
-
-1. 点击右上角「＋」，可按电影、剧集、书籍、游戏、音乐、演出或播客搜索标题。
-2. 首次使用时，在同一弹窗点击「获取 NeoDB 访问令牌」，登录你的 `neodb.social` 账号，从开发者控制台取得具备 `read`、`write` 权限的令牌。粘贴到弹窗的密码输入框，点击「连接 NeoDB」，核对显示的账号。
-3. 选择搜索结果，填写状态、评分、短评和可见范围，点击「添加并同步 NeoDB」。新条目默认仅自己可见，不额外发布到联邦时间线。
-
-令牌只保存在项目目录之外的 `../.mydbdb-local/neodb.json`（即 `temp/.mydbdb-local/neodb.json`），不写入 HTML、展示 JSON、日志或 Git。这样旧的项目静态服务器也不会提供令牌文件。不要把令牌发到聊天里。授权过期时，弹窗会要求重新连接。
-
-已有收藏会先读取并填入原状态、评分、短评和可见范围，按钮显示「更新并同步 NeoDB」。保存时保留 NeoDB 原标签和标记日期，本站按 UUID 更新，不重复添加。
-
-服务先提交 NeoDB，再读取确认结果，最后更新 `media_data.json`；统计、收藏和时间轴随后一起刷新。失败会保留表单并显示具体原因。如果提示「已同步 NeoDB，但本地保存失败」，修复后再次点击确认；服务会先核对远端，内容相同就只补齐本地文件，不重复提交。
-
-搜索无需授权；写入个人收藏必须先连接账号。导入新的 ZIP 仍按导出快照替换本地数据，因此添加条目后请使用新导出的 ZIP，避免旧快照覆盖本站新增记录；NeoDB 上已同步的记录不受本地导入影响。
-
-接口依据：[NeoDB 授权文档](https://neodb.net/api/)、[目录搜索实现](https://github.com/neodb-social/neodb/blob/a945c3fa09b6a69e20daceb345d2de36700987b0/neodb/catalog/apis.py)、[收藏读写实现](https://github.com/neodb-social/neodb/blob/a945c3fa09b6a69e20daceb345d2de36700987b0/neodb/journal/apis/shelf.py)。
 
 ## 数据对应关系
 
@@ -81,9 +92,9 @@ python server.py
 
 ## 自动部署
 
-推送代码到 `main` 后，GitHub Actions 先测试，再部署到独立的 HTTPS 端口 **18443**。首次需要在服务器安装专用服务、设置添加／同步操作的管理员密码并上传收藏数据，见 [部署指南](deploy/README.md)。
+推送代码到 `main` 后，GitHub Actions 先测试，再部署到独立的 HTTPS 端口 **18443**。首次需要在服务器安装专用服务、设置网站访问密码并上传收藏数据，见 [部署指南](deploy/README.md)。
 
-服务器端浏览收藏、统计和时间轴无需密码，收藏与短评公开可见。仍使用现有「添加条目」窗口，只有添加／同步时需要管理员验证，再连接 NeoDB；添加后同步远端并更新服务器数据。后续代码部署不会覆盖收藏或 NeoDB 授权。本地 `python server.py` 的用法不变。
+服务器端浏览收藏、统计、时间轴及导入 ZIP 均需要密码。已移除新增条目和 NeoDB 同步界面及接口；无需保存 NeoDB 令牌。后续代码部署不会覆盖收藏和私有导入配置。
 
 ## 测试
 

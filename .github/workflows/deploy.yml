@@ -9,6 +9,7 @@ on:
       - '*.js'
       - 'tests/**'
       - 'deploy/**'
+      - 'vendor/**'
       - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
@@ -37,8 +38,8 @@ jobs:
       - run: node --test tests/dashboard.test.cjs tests/add.test.cjs
       - name: Check deployment scripts
         run: |
-          bash -n deploy/setup.sh deploy/publish.sh
-          shellcheck deploy/setup.sh deploy/publish.sh
+          bash -n deploy/setup.sh deploy/publish.sh deploy/require-login.sh
+          shellcheck deploy/setup.sh deploy/publish.sh deploy/require-login.sh
 
   deploy:
     needs: test
@@ -60,7 +61,7 @@ jobs:
           release="${GITHUB_SHA:0:12}-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           echo "RELEASE=$release" >> "$GITHUB_ENV"
           printf '%s\n' "$release" > RELEASE
-          tar -czf "$RUNNER_TEMP/mydbdb.tar.gz" index.html add.js server.py fetch_posters.py RELEASE
+          tar -czf "$RUNNER_TEMP/mydbdb.tar.gz" index.html add.js server.py fetch_posters.py data_tools.py vendor/fflate.js vendor/fflate.LICENSE RELEASE
       - name: Deploy over verified SSH
         shell: bash
         env:
