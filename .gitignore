@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+
+# NeoDB 原始备份包含账号私钥和非公开内容，不提交。
+neodb_*_ndjson.zip
+/data/*
+!/data/.gitkeep
+*.ndjson
+attachments/
+
+# 完整收藏可能包含非公开短评；部署数据单独传输，不随代码发布。
+/media_data.json
+/RELEASE
+
+# 本地验证产物。
+.preview/
+.local/

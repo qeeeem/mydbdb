@@ -364,6 +364,16 @@ const CAT_COLOR  = {movie:'#EF9F27',tv:'#1D9E75',book:'#7F77DD',game:'#639922',m
 const CAT_ICON   = {movie:'🎬',tv:'📺',book:'📖',game:'🎮',music:'🎵'};
 const COMPLETE_LBL={movie:'看过',tv:'看过',book:'读过',game:'玩过',music:'听过',performance:'看过',podcast:'听过'};
 const WISHLIST_LBL2={movie:'想看',tv:'想看',book:'想读',game:'想玩',music:'想听',performance:'想看',podcast:'想听'};
+const STATUS_LBL={progress:'进行中',dropped:'弃坑'};
+
+function escapeHTML(value){
+  return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+function posterFailed(img){
+  const fallback=document.createElement('div');
+  fallback.className='no-poster'; fallback.textContent=img.alt;
+  img.replaceWith(fallback);
+}
 
 document.addEventListener('keydown', e => { if(e.key==='Escape') document.getElementById('modal-bg').classList.remove('open'); });
 
@@ -380,25 +390,49 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
 });
 
 // ══════════ DASHBOARD DATA ══════════
-const DAILY = {"2013-06-22":{"book":1},"2013-08-10":{"book":1},"2016-08-20":{"book":1},"2017-01-27":{"book":3},"2018-03-29":{"book":10},"2018-12-09":{"book":1,"movie":1},"2018-12-14":{"movie":62},"2019-07-29":{"movie":5,"tv":6},"2019-07-30":{"book":1,"movie":1},"2019-09-09":{"movie":26,"music":1,"tv":4},"2019-09-10":{"movie":3,"music":2},"2020-01-18":{"movie":10,"tv":9},"2020-01-19":{"book":1,"music":1,"tv":1},"2020-01-21":{"movie":11},"2020-01-23":{"tv":1},"2020-02-06":{"book":6,"movie":2,"music":3,"tv":8},"2020-02-12":{"tv":5},"2020-02-13":{"tv":2},"2020-02-14":{"tv":1},"2020-02-15":{"movie":1,"tv":2},"2020-02-17":{"movie":1,"tv":1},"2020-02-21":{"tv":1},"2020-02-22":{"game":14,"movie":1,"music":3},"2020-02-23":{"movie":5,"music":2,"tv":1},"2020-02-24":{"movie":1},"2020-02-25":{"game":1,"movie":2},"2020-02-27":{"book":1},"2020-02-28":{"book":1,"tv":2},"2020-02-29":{"movie":2},"2020-03-02":{"music":1},"2020-03-04":{"tv":1},"2020-03-05":{"movie":1},"2020-03-06":{"movie":1},"2020-03-07":{"movie":3},"2020-03-08":{"movie":2},"2020-03-09":{"movie":3,"music":1},"2020-03-10":{"movie":1},"2020-03-12":{"book":1,"tv":1},"2020-03-15":{"music":6,"tv":1},"2020-03-19":{"music":1},"2020-03-22":{"tv":1},"2020-03-28":{"movie":1},"2020-03-30":{"tv":1},"2020-04-01":{"movie":1},"2020-04-08":{"tv":1},"2020-04-13":{"tv":1},"2020-04-17":{"tv":1},"2020-04-18":{"movie":1},"2020-04-19":{"tv":1},"2020-04-21":{"movie":1,"tv":1},"2020-04-22":{"movie":1,"tv":2},"2020-04-23":{"movie":1},"2020-04-24":{"movie":1},"2020-04-25":{"movie":1},"2020-04-26":{"movie":1,"tv":1},"2020-04-27":{"movie":1},"2020-04-28":{"tv":1},"2020-04-29":{"game":1},"2020-04-30":{"movie":1,"tv":3},"2020-05-01":{"movie":2,"tv":1},"2020-05-03":{"tv":1},"2020-05-04":{"tv":2},"2020-05-05":{"movie":3},"2020-05-07":{"tv":2},"2020-05-08":{"movie":1},"2020-05-09":{"movie":6},"2020-05-10":{"movie":1},"2020-05-11":{"movie":2},"2020-05-13":{"tv":1},"2020-05-15":{"tv":1},"2020-05-16":{"tv":1},"2020-05-17":{"book":1,"tv":1},"2020-05-19":{"movie":1},"2020-05-20":{"tv":1},"2020-05-21":{"tv":1},"2020-05-24":{"movie":1,"tv":1},"2020-05-25":{"movie":4},"2020-05-27":{"movie":2,"tv":2},"2020-05-28":{"movie":1},"2020-05-29":{"movie":3,"tv":2},"2020-05-30":{"movie":1},"2020-05-31":{"movie":1},"2020-06-02":{"movie":2,"tv":1},"2020-06-03":{"tv":1},"2020-06-09":{"tv":1},"2020-06-11":{"tv":1},"2020-06-14":{"tv":1},"2020-06-15":{"movie":1},"2020-06-16":{"tv":1},"2020-06-18":{"movie":3},"2020-06-19":{"movie":1,"tv":1},"2020-06-20":{"tv":1},"2020-06-23":{"tv":1},"2020-06-26":{"tv":1},"2020-06-27":{"movie":1,"tv":1},"2020-06-30":{"book":1,"movie":2},"2020-07-03":{"book":1},"2020-07-08":{"movie":1},"2020-07-09":{"movie":1},"2020-07-10":{"movie":1},"2020-07-11":{"movie":2},"2020-07-13":{"movie":1,"tv":1},"2020-07-14":{"movie":1,"tv":1},"2020-07-16":{"tv":1},"2020-07-25":{"tv":1},"2020-07-26":{"movie":1},"2020-07-28":{"movie":1,"tv":1},"2020-07-30":{"tv":1},"2020-08-01":{"book":1,"tv":1},"2020-08-02":{"tv":1},"2020-08-04":{"tv":1},"2020-08-06":{"tv":1},"2020-08-07":{"tv":1},"2020-08-08":{"movie":2},"2020-08-09":{"movie":3},"2020-08-15":{"tv":1},"2020-08-16":{"movie":1,"tv":2},"2020-08-17":{"tv":1},"2020-08-20":{"tv":1},"2020-08-22":{"tv":1},"2020-08-23":{"movie":2},"2020-08-24":{"tv":1},"2020-08-26":{"tv":1},"2020-08-28":{"movie":1,"tv":1},"2020-08-29":{"tv":1},"2020-08-30":{"tv":1},"2020-08-31":{"movie":1},"2020-09-03":{"movie":3,"tv":1},"2020-09-04":{"movie":2,"tv":1},"2020-09-08":{"tv":1},"2020-09-11":{"movie":2},"2020-09-12":{"movie":2},"2020-09-16":{"movie":1},"2020-09-23":{"tv":1},"2020-09-24":{"tv":1},"2020-09-30":{"movie":1},"2020-10-04":{"movie":1,"tv":2},"2020-10-05":{"movie":1},"2020-10-06":{"tv":1},"2020-10-07":{"tv":1},"2020-10-11":{"movie":2},"2020-10-13":{"movie":1},"2020-10-14":{"movie":1},"2020-10-15":{"movie":1},"2020-10-16":{"book":2,"movie":1},"2020-10-17":{"movie":1},"2020-10-20":{"movie":4},"2020-10-21":{"tv":1},"2020-10-23":{"tv":1},"2020-10-28":{"movie":2},"2020-10-29":{"movie":1},"2020-10-30":{"movie":1},"2020-11-01":{"tv":2},"2020-11-04":{"book":1},"2020-11-06":{"tv":1},"2020-11-07":{"movie":2},"2020-11-16":{"movie":1},"2020-11-17":{"book":1},"2020-11-23":{"tv":1},"2020-11-24":{"movie":2},"2020-11-25":{"tv":1},"2020-11-28":{"movie":1},"2020-12-02":{"book":1},"2020-12-05":{"movie":1},"2020-12-06":{"movie":1},"2020-12-09":{"tv":1},"2020-12-13":{"book":1},"2020-12-18":{"movie":2,"tv":1},"2020-12-20":{"movie":1},"2020-12-22":{"movie":1},"2020-12-23":{"music":1,"tv":1},"2020-12-24":{"tv":1},"2020-12-25":{"tv":1},"2020-12-26":{"movie":1,"tv":1},"2020-12-28":{"tv":1},"2020-12-30":{"tv":1},"2021-01-01":{"movie":1},"2021-01-02":{"tv":1},"2021-01-03":{"tv":1},"2021-01-09":{"tv":1},"2021-01-10":{"tv":1},"2021-01-12":{"tv":1},"2021-01-14":{"movie":1},"2021-01-15":{"movie":1,"tv":1},"2021-01-16":{"movie":1},"2021-01-17":{"movie":1,"tv":1},"2021-01-19":{"tv":1},"2021-01-20":{"tv":1},"2021-01-22":{"tv":1},"2021-01-26":{"tv":1},"2021-01-29":{"movie":1,"tv":1},"2021-01-30":{"movie":1},"2021-01-31":{"movie":1},"2021-02-02":{"tv":1},"2021-02-03":{"movie":3,"tv":1},"2021-02-04":{"tv":1},"2021-02-05":{"movie":1,"tv":1},"2021-02-07":{"movie":1,"tv":1},"2021-02-08":{"movie":1},"2021-02-10":{"tv":1},"2021-02-11":{"book":1,"tv":1},"2021-02-16":{"movie":1},"2021-02-18":{"game":1,"movie":1},"2021-02-19":{"movie":1},"2021-02-20":{"movie":1},"2021-02-22":{"movie":1},"2021-02-23":{"movie":3},"2021-02-25":{"tv":1},"2021-02-26":{"movie":3},"2021-02-27":{"movie":2,"tv":2},"2021-02-28":{"movie":1},"2021-03-02":{"movie":1,"tv":1},"2021-03-04":{"tv":1},"2021-03-05":{"tv":1},"2021-03-06":{"movie":3},"2021-03-08":{"movie":2},"2021-03-11":{"movie":1,"tv":1},"2021-03-12":{"movie":1},"2021-03-15":{"tv":1},"2021-03-21":{"movie":1,"tv":1},"2021-03-26":{"book":1,"movie":2,"tv":1},"2021-03-27":{"book":1,"movie":1},"2021-03-28":{"movie":1,"tv":1},"2021-03-29":{"movie":2,"tv":1},"2021-03-30":{"tv":1},"2021-04-01":{"movie":1},"2021-04-03":{"movie":2},"2021-04-05":{"movie":1,"tv":1},"2021-04-06":{"tv":1},"2021-04-08":{"movie":2},"2021-04-10":{"tv":1},"2021-04-20":{"tv":1},"2021-04-22":{"movie":1},"2021-04-23":{"book":1},"2021-04-26":{"tv":1},"2021-05-01":{"movie":1},"2021-05-03":{"tv":1},"2021-05-04":{"tv":1},"2021-05-08":{"tv":1},"2021-05-09":{"tv":1},"2021-05-20":{"tv":1},"2021-05-21":{"tv":1},"2021-05-22":{"movie":1},"2021-05-27":{"movie":1},"2021-05-29":{"movie":2},"2021-06-05":{"tv":1},"2021-06-12":{"tv":1},"2021-06-19":{"tv":1},"2021-06-20":{"tv":2},"2021-06-21":{"movie":1},"2021-06-22":{"movie":1},"2021-06-29":{"tv":1},"2021-06-30":{"movie":1},"2021-07-01":{"movie":1,"tv":3},"2021-07-02":{"movie":1},"2021-07-04":{"movie":1,"tv":1},"2021-07-07":{"tv":1},"2021-07-09":{"movie":1},"2021-07-10":{"movie":2},"2021-07-11":{"movie":1},"2021-07-13":{"movie":2,"tv":2},"2021-07-14":{"movie":1},"2021-07-16":{"movie":1},"2021-07-17":{"movie":2,"tv":1},"2021-07-18":{"movie":2},"2021-07-20":{"movie":2},"2021-07-22":{"movie":1},"2021-07-24":{"movie":3},"2021-07-25":{"movie":5},"2021-07-27":{"movie":1},"2021-07-28":{"movie":1},"2021-07-30":{"movie":1},"2021-07-31":{"movie":4,"tv":1},"2021-08-03":{"movie":1},"2021-08-04":{"movie":1},"2021-08-05":{"movie":2},"2021-08-07":{"movie":1},"2021-08-08":{"movie":1},"2021-08-11":{"movie":1},"2021-08-12":{"movie":1},"2021-08-13":{"movie":2},"2021-08-14":{"movie":1},"2021-08-15":{"movie":4},"2021-08-20":{"movie":2},"2021-08-21":{"movie":4},"2021-08-22":{"movie":2},"2021-08-23":{"movie":1},"2021-08-24":{"movie":1},"2021-08-25":{"movie":2},"2021-08-26":{"movie":1},"2021-08-27":{"movie":1},"2021-08-28":{"movie":3},"2021-08-29":{"movie":3},"2021-08-31":{"movie":1},"2021-09-01":{"movie":1,"tv":1},"2021-09-02":{"movie":1},"2021-09-04":{"movie":1},"2021-09-05":{"book":1,"tv":1},"2021-09-06":{"movie":1},"2021-09-07":{"movie":1},"2021-09-08":{"movie":1,"tv":1},"2021-09-10":{"movie":1},"2021-09-11":{"movie":5},"2021-09-12":{"movie":2,"tv":2},"2021-09-16":{"book":1},"2021-09-18":{"movie":2},"2021-09-19":{"tv":1},"2021-09-20":{"movie":1},"2021-09-24":{"movie":2},"2021-09-25":{"movie":1},"2021-09-30":{"movie":1,"tv":1},"2021-10-01":{"tv":1},"2021-10-03":{"movie":1},"2021-10-04":{"movie":1},"2021-10-07":{"movie":2},"2021-10-09":{"movie":3},"2021-10-10":{"movie":2},"2021-10-13":{"movie":1},"2021-10-16":{"movie":2},"2021-10-17":{"movie":2},"2021-10-19":{"movie":1},"2021-10-20":{"movie":1},"2021-10-21":{"movie":1},"2021-10-22":{"movie":1},"2021-10-23":{"movie":3},"2021-10-24":{"movie":1},"2021-10-30":{"movie":3},"2021-11-04":{"movie":1},"2021-11-05":{"movie":1},"2021-11-06":{"movie":1},"2021-11-07":{"movie":1},"2021-11-10":{"movie":2},"2021-11-14":{"movie":1},"2021-11-16":{"movie":1},"2021-11-17":{"movie":1},"2021-11-19":{"tv":1},"2021-11-21":{"movie":1},"2021-11-22":{"movie":1,"tv":1},"2021-11-23":{"movie":1},"2021-11-26":{"movie":1},"2021-11-27":{"movie":2,"tv":1},"2021-12-01":{"tv":1},"2021-12-04":{"movie":2},"2021-12-05":{"movie":1},"2021-12-07":{"movie":1},"2021-12-09":{"movie":1,"tv":1},"2021-12-10":{"movie":1},"2021-12-11":{"tv":1},"2021-12-13":{"movie":1},"2021-12-18":{"movie":1},"2021-12-19":{"movie":1},"2021-12-21":{"movie":1},"2021-12-22":{"tv":1},"2021-12-24":{"movie":2},"2021-12-26":{"movie":2},"2021-12-28":{"movie":1},"2022-01-01":{"movie":2},"2022-01-02":{"movie":2},"2022-01-03":{"movie":4},"2022-01-05":{"movie":2},"2022-01-07":{"movie":1},"2022-01-08":{"movie":3},"2022-01-09":{"movie":1},"2022-01-10":{"movie":1},"2022-01-11":{"tv":1},"2022-01-14":{"movie":1},"2022-01-15":{"movie":1},"2022-01-16":{"tv":1},"2022-01-18":{"movie":1},"2022-01-19":{"movie":1},"2022-01-22":{"movie":1},"2022-01-23":{"book":1},"2022-01-27":{"book":1},"2022-01-29":{"game":1,"movie":1},"2022-02-02":{"movie":2},"2022-02-04":{"movie":1},"2022-02-05":{"tv":1},"2022-02-07":{"movie":1},"2022-02-08":{"movie":1},"2022-02-12":{"tv":2},"2022-02-19":{"movie":2},"2022-02-20":{"book":1,"movie":1},"2022-02-21":{"book":1},"2022-02-23":{"movie":1},"2022-02-24":{"book":1},"2022-02-25":{"movie":2},"2022-03-03":{"book":2},"2022-03-05":{"tv":1},"2022-03-06":{"tv":1},"2022-03-13":{"movie":1},"2022-03-16":{"tv":1},"2022-03-19":{"movie":2},"2022-03-20":{"movie":3},"2022-03-21":{"tv":1},"2022-03-23":{"movie":1},"2022-03-24":{"movie":1},"2022-03-25":{"movie":1},"2022-03-27":{"movie":1},"2022-03-30":{"movie":1},"2022-04-01":{"movie":1,"tv":2},"2022-04-03":{"tv":1},"2022-04-04":{"movie":4},"2022-04-05":{"movie":1},"2022-04-07":{"movie":1},"2022-04-09":{"movie":1},"2022-04-12":{"tv":1},"2022-04-14":{"tv":1},"2022-04-15":{"movie":2},"2022-04-16":{"tv":1},"2022-04-17":{"movie":1},"2022-04-19":{"movie":1},"2022-04-20":{"movie":1},"2022-04-22":{"movie":1},"2022-04-29":{"tv":1},"2022-05-01":{"tv":1},"2022-05-02":{"movie":1},"2022-05-03":{"movie":1},"2022-05-05":{"movie":1},"2022-05-06":{"movie":1},"2022-05-07":{"movie":2},"2022-05-08":{"book":1,"movie":2},"2022-05-09":{"movie":4},"2022-05-10":{"book":1,"movie":2},"2022-05-11":{"movie":1},"2022-05-12":{"movie":4},"2022-05-13":{"movie":1},"2022-05-14":{"movie":1},"2022-05-15":{"movie":3},"2022-05-16":{"movie":1},"2022-05-17":{"movie":1},"2022-05-18":{"movie":1},"2022-05-20":{"movie":2},"2022-05-21":{"tv":1},"2022-05-23":{"movie":1},"2022-06-01":{"movie":1},"2022-07-04":{"movie":1},"2022-07-11":{"movie":1},"2022-07-13":{"movie":1},"2022-07-14":{"movie":1},"2022-07-15":{"movie":1},"2022-07-16":{"movie":3},"2022-07-17":{"movie":3},"2022-07-18":{"movie":1},"2022-07-28":{"movie":1},"2022-07-30":{"movie":1},"2022-08-04":{"movie":1},"2022-08-06":{"movie":1},"2022-08-07":{"movie":1},"2022-08-09":{"movie":1},"2022-08-11":{"movie":2},"2022-08-14":{"movie":1},"2022-08-15":{"movie":2},"2022-08-16":{"movie":1},"2022-08-19":{"movie":1,"tv":1},"2022-08-26":{"movie":2},"2022-08-27":{"movie":1},"2022-09-03":{"movie":2},"2022-09-09":{"movie":1},"2022-09-10":{"movie":1},"2022-09-13":{"movie":3},"2022-09-14":{"movie":1},"2022-09-30":{"movie":1},"2022-10-03":{"movie":1},"2022-10-06":{"movie":1},"2022-10-14":{"movie":2},"2022-10-15":{"movie":2},"2022-10-29":{"movie":1},"2022-10-30":{"movie":4},"2022-11-04":{"game":1},"2022-11-06":{"movie":1},"2022-11-09":{"movie":1},"2022-11-13":{"movie":1},"2022-11-20":{"tv":1},"2022-11-26":{"tv":1},"2022-11-30":{"movie":1},"2022-12-04":{"movie":1},"2022-12-05":{"movie":1},"2022-12-10":{"movie":1},"2022-12-25":{"movie":2},"2023-01-01":{"movie":2},"2023-01-02":{"movie":1},"2023-01-06":{"book":1,"movie":1},"2023-01-22":{"movie":2},"2023-02-15":{"movie":1},"2023-02-18":{"movie":2},"2023-02-27":{"movie":1},"2023-03-05":{"movie":1},"2023-04-03":{"movie":1},"2023-04-07":{"tv":1},"2023-04-30":{"game":1},"2023-05-08":{"tv":1},"2023-08-18":{"tv":1},"2023-08-23":{"movie":1},"2023-09-01":{"movie":1},"2023-09-11":{"movie":1},"2023-09-12":{"movie":1},"2023-09-28":{"game":1},"2023-11-06":{"book":1},"2023-11-07":{"movie":1},"2023-11-13":{"book":1},"2023-12-05":{"movie":1},"2023-12-26":{"movie":1},"2024-01-03":{"book":1},"2024-01-27":{"book":1},"2024-02-10":{"movie":1},"2024-02-21":{"movie":1},"2024-02-28":{"tv":1},"2024-03-12":{"tv":1},"2024-03-21":{"book":1},"2024-04-13":{"tv":1},"2024-04-21":{"tv":1},"2024-04-25":{"book":1,"tv":1},"2024-04-30":{"book":1},"2024-05-04":{"book":1,"movie":1},"2024-05-12":{"book":1},"2024-05-17":{"movie":1},"2024-05-18":{"book":1,"movie":1,"music":1},"2024-05-22":{"book":1},"2024-05-24":{"book":1},"2024-05-26":{"movie":1},"2024-05-28":{"book":1},"2024-05-30":{"tv":1},"2024-05-31":{"book":1,"movie":1},"2024-06-08":{"tv":1},"2024-06-10":{"book":1},"2024-06-14":{"movie":1},"2024-06-18":{"tv":1},"2024-06-20":{"book":1,"tv":1},"2024-06-22":{"tv":1},"2024-06-24":{"tv":1},"2024-06-25":{"tv":1},"2024-06-26":{"movie":1},"2024-06-27":{"movie":1},"2024-06-28":{"book":3,"movie":1},"2024-06-29":{"movie":1},"2024-07-01":{"movie":1},"2024-07-02":{"movie":1},"2024-07-03":{"game":1},"2024-07-07":{"movie":1},"2024-07-13":{"movie":1},"2024-07-20":{"movie":1},"2024-07-21":{"movie":1},"2024-07-25":{"book":2,"tv":1},"2024-08-05":{"tv":1},"2024-08-07":{"tv":1},"2024-08-12":{"movie":1},"2024-08-14":{"tv":1},"2024-08-16":{"movie":2},"2024-08-23":{"game":1},"2024-09-26":{"movie":1},"2024-10-06":{"movie":1,"tv":1},"2024-10-13":{"book":1,"performance":1},"2024-10-17":{"movie":1},"2024-10-18":{"game":1},"2024-11-13":{"tv":1},"2024-11-16":{"movie":2},"2024-11-20":{"book":1},"2024-11-22":{"book":1},"2024-11-24":{"game":2,"movie":1},"2024-11-28":{"movie":1,"tv":1},"2024-12-02":{"game":1},"2024-12-11":{"movie":1},"2024-12-13":{"tv":1},"2024-12-14":{"game":1},"2024-12-15":{"tv":1},"2024-12-16":{"movie":1},"2024-12-17":{"book":1},"2024-12-20":{"tv":1},"2024-12-22":{"game":1},"2024-12-26":{"tv":1},"2024-12-29":{"tv":1},"2024-12-30":{"game":2},"2024-12-31":{"tv":1},"2025-01-06":{"book":1,"movie":1},"2025-01-08":{"movie":1},"2025-01-11":{"movie":1,"tv":2},"2025-01-20":{"movie":1,"tv":2},"2025-01-26":{"podcast":1,"tv":1},"2025-01-30":{"book":1},"2025-02-08":{"tv":1},"2025-02-13":{"tv":1},"2025-02-22":{"book":1},"2025-02-24":{"game":1},"2025-02-25":{"tv":1},"2025-02-28":{"tv":1},"2025-03-03":{"movie":1},"2025-03-05":{"game":1,"tv":1},"2025-03-07":{"tv":1},"2025-03-09":{"game":1},"2025-03-10":{"tv":1},"2025-03-12":{"book":1,"movie":1,"tv":1},"2025-03-14":{"movie":1},"2025-03-15":{"game":1},"2025-03-17":{"tv":1},"2025-03-21":{"tv":1},"2025-03-22":{"game":1},"2025-03-28":{"game":1},"2025-03-31":{"tv":1},"2025-04-05":{"movie":1,"tv":1},"2025-04-06":{"book":1},"2025-04-12":{"tv":1},"2025-04-21":{"book":1},"2025-04-24":{"book":1},"2025-04-25":{"book":1},"2025-04-26":{"book":2,"game":1,"movie":1},"2025-04-30":{"game":1,"movie":1},"2025-05-01":{"book":1},"2025-05-05":{"book":2},"2025-05-08":{"book":1,"tv":1},"2025-05-11":{"book":1,"movie":1},"2025-05-18":{"game":1},"2025-05-19":{"movie":1},"2025-05-23":{"book":2},"2025-05-24":{"movie":1,"tv":1},"2025-05-25":{"tv":1},"2025-05-26":{"movie":1},"2025-05-27":{"game":2},"2025-05-28":{"book":2,"game":1},"2025-05-31":{"book":1},"2025-06-02":{"tv":1},"2025-06-03":{"movie":1},"2025-06-06":{"book":1},"2025-06-07":{"book":1,"tv":2},"2025-06-10":{"tv":1},"2025-06-15":{"book":1,"game":1},"2025-06-19":{"book":1},"2025-06-20":{"tv":1},"2025-06-22":{"book":1},"2025-06-24":{"book":3},"2025-06-27":{"game":1},"2025-06-29":{"book":2,"game":2},"2025-07-01":{"book":1},"2025-07-02":{"book":1},"2025-07-05":{"book":1,"game":2},"2025-07-11":{"book":2,"performance":1},"2025-07-12":{"book":1,"tv":1},"2025-07-14":{"book":1},"2025-07-18":{"book":1},"2025-07-21":{"book":1},"2025-07-22":{"game":1},"2025-07-26":{"movie":1},"2025-07-27":{"book":1},"2025-07-31":{"tv":1},"2025-08-03":{"book":2},"2025-08-05":{"movie":1},"2025-08-12":{"book":1},"2025-08-16":{"book":1},"2025-08-17":{"book":1,"movie":1},"2025-08-19":{"book":1},"2025-08-21":{"book":1},"2025-08-23":{"book":1},"2025-08-25":{"book":1},"2025-08-28":{"book":1,"game":1},"2025-08-30":{"book":1},"2025-08-31":{"tv":1},"2025-09-01":{"book":1},"2025-09-13":{"tv":1},"2025-09-18":{"tv":1},"2025-09-20":{"tv":1},"2025-09-24":{"book":1},"2025-10-01":{"book":1,"movie":1,"tv":1},"2025-10-11":{"tv":1},"2025-10-15":{"tv":1},"2025-10-16":{"book":1},"2025-10-26":{"book":1},"2025-10-28":{"book":1},"2025-10-31":{"book":1},"2025-11-02":{"book":1,"movie":1},"2025-11-05":{"book":1},"2025-11-12":{"book":1},"2025-11-15":{"book":1},"2025-11-20":{"tv":1},"2025-11-22":{"book":1},"2025-12-06":{"movie":1},"2025-12-07":{"book":1},"2025-12-09":{"book":2,"movie":1},"2025-12-14":{"book":1},"2025-12-17":{"movie":1},"2025-12-18":{"movie":1},"2025-12-20":{"movie":1,"tv":3},"2025-12-24":{"movie":1},"2025-12-27":{"movie":1,"tv":1},"2025-12-28":{"movie":1},"2025-12-30":{"movie":2},"2025-12-31":{"movie":1},"2026-01-03":{"movie":2},"2026-01-06":{"book":1,"movie":1},"2026-01-15":{"movie":1},"2026-01-18":{"movie":1},"2026-01-19":{"tv":1},"2026-01-28":{"book":1},"2026-01-30":{"tv":1},"2026-02-03":{"tv":1},"2026-02-05":{"book":1},"2026-02-08":{"movie":1,"music":1},"2026-02-09":{"book":1,"movie":1},"2026-02-11":{"tv":1},"2026-02-13":{"book":1},"2026-02-14":{"book":1},"2026-02-19":{"book":1},"2026-02-20":{"movie":1,"tv":1},"2026-02-22":{"movie":2},"2026-03-05":{"movie":1},"2026-03-08":{"movie":1},"2026-03-15":{"game":1,"movie":1},"2026-03-16":{"movie":2},"2026-03-17":{"movie":1},"2026-03-19":{"movie":1},"2026-03-20":{"movie":1},"2026-03-21":{"game":2},"2026-03-22":{"movie":1,"tv":1},"2026-03-23":{"movie":1},"2026-03-24":{"movie":1},"2026-03-25":{"movie":1},"2026-03-26":{"movie":1},"2026-03-27":{"movie":2},"2026-03-28":{"movie":4,"tv":1},"2026-03-29":{"movie":1}};
-const MONTHLY = {"2020-01":{"book":1,"movie":21,"music":1,"tv":11},"2020-02":{"book":8,"game":15,"movie":15,"music":8,"tv":23},"2020-03":{"book":1,"movie":12,"music":9,"tv":5},"2020-04":{"game":1,"movie":10,"tv":12},"2020-05":{"book":1,"movie":29,"tv":17},"2020-06":{"book":1,"movie":10,"tv":11},"2020-07":{"book":1,"movie":9,"tv":6},"2020-08":{"book":1,"movie":10,"tv":16},"2020-09":{"movie":11,"tv":5},"2020-10":{"book":2,"movie":17,"tv":6},"2020-11":{"book":2,"movie":6,"tv":5},"2020-12":{"book":2,"movie":7,"music":1,"tv":8},"2021-01":{"movie":8,"tv":12},"2021-02":{"book":1,"game":1,"movie":20,"tv":10},"2021-03":{"book":2,"movie":15,"tv":10},"2021-04":{"book":1,"movie":7,"tv":5},"2021-05":{"movie":5,"tv":6},"2021-06":{"movie":3,"tv":6},"2021-07":{"movie":33,"tv":9},"2021-08":{"movie":36},"2021-09":{"book":2,"movie":21,"tv":7},"2021-10":{"movie":25,"tv":1},"2021-11":{"movie":15,"tv":3},"2021-12":{"movie":15,"tv":4},"2022-01":{"book":2,"game":1,"movie":22,"tv":2},"2022-02":{"book":3,"movie":11,"tv":3},"2022-03":{"book":2,"movie":11,"tv":4},"2022-04":{"movie":14,"tv":7},"2022-05":{"book":2,"movie":30,"tv":2},"2022-06":{"movie":1},"2022-07":{"movie":14},"2022-08":{"movie":14,"tv":1},"2022-09":{"movie":9},"2022-10":{"movie":11},"2022-11":{"game":1,"movie":4,"tv":2},"2022-12":{"movie":5},"2023-01":{"book":1,"movie":6},"2023-02":{"movie":4},"2023-03":{"movie":1},"2023-04":{"game":1,"movie":1,"tv":1},"2023-05":{"tv":1},"2023-08":{"movie":1,"tv":1},"2023-09":{"game":1,"movie":3},"2023-11":{"book":2,"movie":1},"2023-12":{"movie":2},"2024-01":{"book":2},"2024-02":{"movie":2,"tv":1},"2024-03":{"book":1,"tv":1},"2024-04":{"book":2,"tv":3},"2024-05":{"book":7,"movie":5,"music":1,"tv":1},"2024-06":{"book":5,"movie":5,"tv":6},"2024-07":{"book":2,"game":1,"movie":6,"tv":1},"2024-08":{"game":1,"movie":3,"tv":3},"2024-09":{"movie":1},"2024-10":{"book":1,"game":1,"movie":2,"performance":1,"tv":1},"2024-11":{"book":2,"game":2,"movie":4,"tv":2},"2024-12":{"book":1,"game":5,"movie":2,"tv":6},"2025-01":{"book":2,"movie":4,"podcast":1,"tv":5},"2025-02":{"book":1,"game":1,"tv":4},"2025-03":{"book":1,"game":5,"movie":3,"tv":7},"2025-04":{"book":6,"game":2,"movie":3,"tv":2},"2025-05":{"book":10,"game":4,"movie":4,"tv":3},"2025-06":{"book":10,"game":4,"movie":1,"tv":5},"2025-07":{"book":10,"game":3,"movie":1,"performance":1,"tv":2},"2025-08":{"book":11,"game":1,"movie":2,"tv":1},"2025-09":{"book":2,"tv":3},"2025-10":{"book":5,"movie":1,"tv":3},"2025-11":{"book":5,"movie":1,"tv":1},"2025-12":{"book":4,"movie":11,"tv":4},"2026-01":{"book":2,"movie":5,"tv":2},"2026-02":{"book":5,"movie":5,"music":1,"tv":3},"2026-03":{"game":3,"movie":20,"tv":2}};
-const YEARLY = {2013:2,2016:1,2017:3,2018:74,2019:49,2020:337,2021:283,2022:178,2023:27,2024:90,2025:160,2026:48};
+let DAILY = {};
+let MONTHLY = {};
+let YEARLY = {};
 const D_CATS = ['movie','tv','book','game','music','performance','podcast'];
 const D_LBL  = {movie:'电影',tv:'剧集',book:'书籍',game:'游戏',music:'音乐',performance:'演出',podcast:'Podcast'};
 const D_MONTHS_ZH = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
 const D_MONTHS_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-const D_YEARS = [2020,2021,2022,2023,2024,2025,2026];
+let D_YEARS = [];
 
 // ══════════ DASHBOARD ══════════
-let dashInited=false, dActiveYear=2026, dMonthChart=null, dYearChart=null;
+let dashInited=false, dataLoaded=false, dActiveYear=null, dMonthChart=null, dYearChart=null;
+let dCounts={total:0, status:{}, category:{}};
+
+function updateDash(rows){
+  DAILY={}; MONTHLY={}; YEARLY={};
+  dCounts={total:rows.length, status:{}, category:{}};
+  rows.forEach(r=>{
+    dCounts.status[r.status]=(dCounts.status[r.status]||0)+1;
+    dCounts.category[r.category]=(dCounts.category[r.category]||0)+1;
+    const day=(r.timestamp||'').slice(0,10);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
+    const month=day.slice(0,7), year=day.slice(0,4);
+    if(!DAILY[day]) DAILY[day]={};
+    if(!MONTHLY[month]) MONTHLY[month]={};
+    DAILY[day][r.category]=(DAILY[day][r.category]||0)+1;
+    MONTHLY[month][r.category]=(MONTHLY[month][r.category]||0)+1;
+    YEARLY[year]=(YEARLY[year]||0)+1;
+  });
+  D_YEARS=Object.keys(YEARLY).map(Number).sort((a,b)=>a-b);
+  if(!D_YEARS.includes(dActiveYear)) dActiveYear=D_YEARS[D_YEARS.length-1]||new Date().getFullYear();
+  dataLoaded=true;
+  dashInited=false;
+  initDash();
+}
 
 function initDash(){
-  if(dashInited) return;
+  if(!dataLoaded || dashInited) return;
   dashInited=true;
 
-  const STATS_R1=[{l:'全部记录',v:1256,c:''},{l:'已完成',v:970,c:'#1D9E75'},{l:'想看',v:257,c:'#7F77DD'},{l:'已弃坑',v:21,c:'#D85A30'}];
-  const STATS_R2=[{l:'电影',v:714,c:CAT_COLOR.movie},{l:'剧集',v:304,c:CAT_COLOR.tv},{l:'书籍',v:153,c:CAT_COLOR.book},{l:'游戏',v:54,c:CAT_COLOR.game}];
+  const STATS_R1=[{l:'全部记录',v:dCounts.total,c:''},{l:'已完成',v:dCounts.status.complete||0,c:'#1D9E75'},{l:'想看',v:dCounts.status.wishlist||0,c:'#7F77DD'},{l:'已弃坑',v:dCounts.status.dropped||0,c:'#D85A30'}];
+  const STATS_R2=[{l:'电影',v:dCounts.category.movie||0,c:CAT_COLOR.movie},{l:'剧集',v:dCounts.category.tv||0,c:CAT_COLOR.tv},{l:'书籍',v:dCounts.category.book||0,c:CAT_COLOR.book},{l:'游戏',v:dCounts.category.game||0,c:CAT_COLOR.game}];
   const se=document.getElementById('d-stats');
+  se.innerHTML='';
   [...STATS_R1,...STATS_R2].forEach(({l,v,c})=>{
     const d=document.createElement('div'); d.className='stat';
     if(c) d.style.borderTopColor=c;
@@ -407,6 +441,7 @@ function initDash(){
   });
 
   const le=document.getElementById('d-legend');
+  le.innerHTML='';
   D_CATS.forEach(c=>{
     const s=document.createElement('span'); s.className='legend-item';
     s.innerHTML=`<span class="legend-dot" style="background:${CAT_COLOR[c]}"></span>${D_LBL[c]}`;
@@ -414,10 +449,11 @@ function initDash(){
   });
 
   const ye=document.getElementById('d-yr-btns');
+  ye.innerHTML='';
   D_YEARS.forEach(y=>{
     const b=document.createElement('button'); b.className='yr-btn'+(y===dActiveYear?' active':'');
     b.textContent=y;
-    b.onclick=()=>{ document.querySelectorAll('.yr-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); dActiveYear=y; buildHM(y); buildMC(y); };
+    b.onclick=()=>{ document.querySelectorAll('.yr-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); dActiveYear=y; buildHM(y); buildMC(y); buildYC(); };
     ye.appendChild(b);
   });
 
@@ -464,11 +500,11 @@ function buildMC(year){
 }
 
 function buildYC(){
-  const labels=Object.keys(YEARLY).map(String), vals=Object.values(YEARLY);
+  const labels=Object.keys(YEARLY).sort(), vals=labels.map(y=>YEARLY[y]);
+  if(dYearChart) dYearChart.destroy();
   dYearChart=new Chart(document.getElementById('d-year-chart'),{type:'bar',data:{labels,datasets:[{data:vals,backgroundColor:labels.map(y=>parseInt(y)===dActiveYear?'#EF9F27cc':'#7F77DDcc'),borderWidth:0,borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#666',font:{size:11}},border:{color:'transparent'}},y:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#666',font:{size:11}},border:{color:'transparent'}}}}});
 }
 
-initDash();
 const lastTab = localStorage.getItem('lastTab');
 if(lastTab && lastTab !== 'dashboard'){
   document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
@@ -491,10 +527,13 @@ async function loadData(){
     ALL=await r.json();
     ALL=ALL.filter(r=>['movie','tv','book','game','music','performance','podcast'].includes(r.category));
   }catch(e){
+    if(!dataLoaded) document.getElementById('d-stats').textContent='数据加载失败，请刷新重试';
     ['g-empty','t-empty'].forEach(id=>{const el=document.getElementById(id);if(el){el.textContent='请先运行 fetch_posters.py 生成 media_data.json';el.style.display='block';}});
-    return;
+    return false;
   }
   applyGallery(); applyTimeline();
+  updateDash(ALL);
+  return true;
 }
 
 // ── Gallery ──
@@ -599,16 +638,16 @@ window.setTView = function(v){
 function cardHTML(r,i,prefix){
   const col=CAT_COLOR[r.category]||'#888';
   const ov=(r.rating||r.comment)?`<div class="poster-overlay">${r.rating?`<div class="ov-rating" style="color:${col}">${r.rating} <span style="font-size:11px;color:#aaa">/ 10</span></div>`:''
-  }${r.comment?`<div class="ov-comment">${r.comment}</div>`:''}</div>`:'';
+  }${r.comment?`<div class="ov-comment">${escapeHTML(r.comment)}</div>`:''}</div>`:'';
   const WISHLIST_LBL = {movie:'想看',tv:'想看',book:'想读',game:'想玩',music:'想听',performance:'想看',podcast:'想听'};
 const badge=r.status==='wishlist'?`<span class="badge badge-wishlist">${WISHLIST_LBL[r.category]||'想看'}</span>`:r.status==='dropped'?'<span class="badge badge-dropped">弃</span>':'';
   const img=r.poster
-    ?`<img class="loading" src="${r.poster}" alt="${r.title}" loading="lazy" onload="this.classList.replace('loading','loaded')" onerror="this.parentNode.innerHTML='<div class=no-poster><div class=np-cat>${CAT_ICON[r.category]||'?'}</div><div>${r.title}</div></div>'">`
-    :`<div class="no-poster"><div class="np-cat">${CAT_ICON[r.category]||'?'}</div><div>${r.title}</div></div>`;
+    ?`<img class="loading" src="${escapeHTML(r.poster)}" alt="${escapeHTML(r.title)}" loading="lazy" onload="this.classList.replace('loading','loaded')" onerror="posterFailed(this)">`
+    :`<div class="no-poster"><div class="np-cat">${CAT_ICON[r.category]||'?'}</div><div>${escapeHTML(r.title)}</div></div>`;
   return `<div class="card" onclick="openModal('${prefix}',${i})">
     <div class="poster-wrap">${img}${ov}${badge}<div class="cat-dot" style="background:${col}"></div></div>
-    <div class="card-title">${r.title}</div>
-    <div class="card-meta">${r.timestamp||r.year||''}</div>
+    <div class="card-title">${escapeHTML(r.title)}</div>
+    <div class="card-meta">${escapeHTML(r.timestamp||r.year||'')}</div>
   </div>`;
 }
 
@@ -681,9 +720,18 @@ loadData();
 </script>
 <!-- ══════════ ADD PANEL ══════════ -->
 <div id="add-bg" style="position:fixed;inset:0;background:rgba(0,0,0,0.7);display:none;z-index:400;align-items:flex-start;justify-content:center;padding:60px 1rem 1rem">
-<div style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:14px;width:100%;max-width:480px;padding:1.5rem;position:relative">
+<div style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:14px;width:100%;max-width:480px;padding:1.5rem;position:relative;max-height:calc(100vh - 80px);overflow-y:auto">
   <button onclick="closeAddPanel()" style="position:absolute;top:1rem;right:1rem;width:28px;height:28px;border-radius:50%;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text2);cursor:pointer;font-size:14px">✕</button>
   <div style="font-size:14px;font-weight:500;margin-bottom:1rem">添加条目</div>
+
+  <div id="add-account" style="font-size:14px;margin-bottom:12px"></div>
+  <div id="add-auth" style="display:none;margin-bottom:16px">
+    <a href="https://neodb.social/developer/" target="_blank" rel="noopener noreferrer" style="color:var(--text2);font-size:14px">获取 NeoDB 访问令牌</a>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <input id="add-token" type="password" autocomplete="off" placeholder="NeoDB 访问令牌" aria-label="NeoDB 访问令牌" style="flex:1;min-width:0;background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--r);padding:8px;color:var(--text);font:inherit;font-size:14px">
+      <button type="button" onclick="connectNeoDB()" class="add-action">连接 NeoDB</button>
+    </div>
+  </div>
 
   <!-- 类型选择 -->
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px" id="add-cats">
@@ -701,10 +749,10 @@ loadData();
     style="width:100%;background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--r);padding:8px 12px;font-size:13px;color:var(--text);font-family:inherit;outline:none;margin-bottom:8px">
 
   <!-- 搜索结果 -->
-  <div id="add-results" style="display:none;margin-bottom:12px;max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:6px"></div>
+  <div id="add-results" style="display:none;margin-bottom:12px;max-height:240px;overflow-y:auto;flex-direction:column;gap:6px;font-size:14px"></div>
 
   <!-- 已选条目预览 -->
-  <div id="add-selected" style="display:none;background:var(--bg3);border-radius:var(--r);padding:10px;margin-bottom:12px;display:flex;gap:10px;align-items:center">
+  <div id="add-selected" style="display:none;background:var(--bg3);border-radius:var(--r);padding:10px;margin-bottom:12px;gap:10px;align-items:center">
     <img id="add-sel-img" src="" style="width:40px;height:60px;object-fit:cover;border-radius:4px;flex-shrink:0">
     <div>
       <div id="add-sel-title" style="font-size:13px;font-weight:500"></div>
@@ -723,140 +771,34 @@ loadData();
       </select>
       <input id="add-rating" type="number" min="1" max="10" placeholder="评分 1-10"
         style="width:100px;background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--r);padding:6px 10px;font-size:12px;color:var(--text);font-family:inherit;outline:none">
+      <select id="add-visibility" aria-label="NeoDB 可见范围" style="background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--r);padding:6px 10px;font-size:14px;color:var(--text);font-family:inherit">
+        <option value="2">仅自己可见</option>
+        <option value="1">关注者可见</option>
+        <option value="0">公开</option>
+      </select>
     </div>
     <textarea id="add-comment" placeholder="评语（可选）" rows="3"
       style="width:100%;background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--r);padding:8px 10px;font-size:12px;color:var(--text);font-family:inherit;outline:none;resize:vertical;margin-bottom:10px"></textarea>
-    <button onclick="submitAdd()"
+    <button id="add-submit" onclick="submitAdd()" disabled
       style="width:100%;padding:8px;background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:13px;cursor:pointer;font-family:inherit">
-      确认添加
+      添加并同步 NeoDB
     </button>
-    <div id="add-msg" style="font-size:12px;margin-top:8px;text-align:center"></div>
   </div>
+  <div id="add-msg" role="status" style="font-size:14px;margin-top:8px;line-height:1.6"></div>
 </div>
 </div>
 
 <style>
 .add-cat-btn{padding:3px 10px;font-size:12px;border-radius:20px;border:0.5px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;font-family:inherit}
 .add-cat-btn.active{background:var(--bg3);color:var(--text);border-color:rgba(255,255,255,0.25)}
-.add-result-item{display:flex;gap:8px;align-items:center;padding:7px 8px;border-radius:6px;cursor:pointer;border:0.5px solid var(--border)}
+.add-result-item{display:flex;gap:8px;align-items:center;padding:7px 8px;border-radius:6px;cursor:pointer;border:0.5px solid var(--border);background:transparent;color:var(--text);font:inherit;font-size:14px;text-align:left;width:100%}
 .add-result-item:hover{background:var(--bg3)}
+.add-result-item img{width:36px;height:54px;object-fit:cover;border-radius:3px;flex-shrink:0}
+.add-result-year{font-size:14px;color:var(--text2);margin-top:4px}
+.add-action{background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--r);color:var(--text);padding:8px;font:inherit;font-size:14px;cursor:pointer}
+#add-bg button:disabled{opacity:.5;cursor:default}
 </style>
 
-<script>
-const ADD_SERVER = 'https://467a-103-151-172-75.ngrok-free.app';
-let addCat = 'movie', addSelected = null, addSearchTimer = null;
-
-function openAddPanel(){
-  document.getElementById('add-bg').style.display='flex';
-  document.getElementById('add-search').focus();
-}
-function closeAddPanel(){
-  document.getElementById('add-bg').style.display='none';
-  resetAddPanel();
-}
-function resetAddPanel(){
-  document.getElementById('add-search').value='';
-  document.getElementById('add-results').style.display='none';
-  document.getElementById('add-results').innerHTML='';
-  document.getElementById('add-selected').style.display='none';
-  document.getElementById('add-form').style.display='none';
-  document.getElementById('add-msg').textContent='';
-  document.getElementById('add-rating').value='';
-  document.getElementById('add-comment').value='';
-  addSelected=null;
-}
-
-// 类型切换
-document.querySelectorAll('.add-cat-btn').forEach(btn=>{
-  btn.onclick=()=>{
-    document.querySelectorAll('.add-cat-btn').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    addCat=btn.dataset.c;
-    resetAddPanel();
-  };
-});
-
-// 搜索
-document.getElementById('add-search').addEventListener('input', e=>{
-  clearTimeout(addSearchTimer);
-  const q=e.target.value.trim();
-  if(!q){document.getElementById('add-results').style.display='none';return;}
-  addSearchTimer=setTimeout(()=>doSearch(q), 400);
-});
-
-async function doSearch(q){
-  const res = document.getElementById('add-results');
-  res.innerHTML='<div style="font-size:12px;color:var(--text3);padding:6px">搜索中…</div>';
-  res.style.display='flex';
-  try{
-    const r = await fetch(`${ADD_SERVER}/api/search?q=${encodeURIComponent(q)}&cat=${addCat}`);
-    const items = await r.json();
-    if(!items.length){res.innerHTML='<div style="font-size:12px;color:var(--text3);padding:6px">无结果</div>';return;}
-    res.innerHTML=items.map((item,i)=>`
-      <div class="add-result-item" onclick="selectItem(${i})">
-        ${item.poster?`<img src="${item.poster}" style="width:30px;height:45px;object-fit:cover;border-radius:3px;flex-shrink:0">`:'<div style="width:30px;height:45px;background:var(--bg3);border-radius:3px;flex-shrink:0"></div>'}
-        <div>
-          <div style="font-size:13px">${item.title}</div>
-          <div style="font-size:11px;color:var(--text2)">${item.year||''}</div>
-        </div>
-      </div>`).join('');
-    res._items=items;
-  }catch(e){
-    res.innerHTML='<div style="font-size:12px;color:#e88a67;padding:6px">无法连接本地服务，请先启动 server.py</div>';
-  }
-}
-
-function selectItem(i){
-  const items=document.getElementById('add-results')._items;
-  addSelected=items[i];
-  document.getElementById('add-results').style.display='none';
-  document.getElementById('add-search').value='';
-  document.getElementById('add-sel-img').src=addSelected.poster||'';
-  document.getElementById('add-sel-img').style.display=addSelected.poster?'block':'none';
-  document.getElementById('add-sel-title').textContent=addSelected.title;
-  document.getElementById('add-sel-year').textContent=addSelected.year||'';
-  document.getElementById('add-selected').style.display='flex';
-  document.getElementById('add-form').style.display='block';
-}
-
-async function submitAdd(){
-  if(!addSelected)return;
-  const msg=document.getElementById('add-msg');
-  msg.textContent='提交中…'; msg.style.color='var(--text2)';
-  const payload={
-    title:    addSelected.title,
-    category: addCat,
-    status:   document.getElementById('add-status').value,
-    rating:   document.getElementById('add-rating').value||null,
-    comment:  document.getElementById('add-comment').value.trim(),
-    year:     addSelected.year||'',
-    poster:   addSelected.poster||null,
-    tmdb_id:  addSelected.id||null,
-    uuid:     addSelected.uuid||'',
-  };
-  try{
-    const r=await fetch(`${ADD_SERVER}/api/add`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    const res=await r.json();
-    if(res.ok){
-      msg.textContent='✓ 已添加！'; msg.style.color='#1D9E75';
-      await loadData();
-      setTimeout(closeAddPanel, 800);
-    } else {
-      msg.textContent=res.error||'添加失败'; msg.style.color='#e88a67';
-    }
-  }catch(e){
-    msg.textContent='无法连接本地服务'; msg.style.color='#e88a67';
-  }
-}
-
-// esc 关闭
-document.addEventListener('keydown', e=>{
-  if(e.key==='Escape') closeAddPanel();
-});
-// 点背景关闭
-document.getElementById('add-bg').addEventListener('click', e=>{
-  if(e.target===document.getElementById('add-bg')) closeAddPanel();
-});
-</script>
+<script src="add.js"></script>
 </body>
 </html>

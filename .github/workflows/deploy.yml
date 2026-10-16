@@ -1,0 +1,89 @@
+name: Deploy mydbdb
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '*.py'
+      - '*.html'
+      - '*.js'
+      - 'tests/**'
+      - 'deploy/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mydbdb-production
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m unittest discover -s tests -v
+      - run: node --test tests/dashboard.test.cjs tests/add.test.cjs
+      - name: Check deployment scripts
+        run: |
+          bash -n deploy/setup.sh deploy/publish.sh
+          shellcheck deploy/setup.sh deploy/publish.sh
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      MYDBDB_HOST: 8.148.157.132
+      MYDBDB_USER: ledger-deploy
+      MYDBDB_PORT: ${{ vars.MYDBDB_PORT || '18443' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Package code only
+        shell: bash
+        run: |
+          set -euo pipefail
+          release="${GITHUB_SHA:0:12}-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          echo "RELEASE=$release" >> "$GITHUB_ENV"
+          printf '%s\n' "$release" > RELEASE
+          tar -czf "$RUNNER_TEMP/mydbdb.tar.gz" index.html add.js server.py fetch_posters.py RELEASE
+      - name: Deploy over verified SSH
+        shell: bash
+        env:
+          DEPLOY_KEY: ${{ secrets.LEDGER_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.LEDGER_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$DEPLOY_KEY" || -z "$KNOWN_HOSTS" ]]; then
+            echo '::error::Set LEDGER_SSH_KEY and LEDGER_KNOWN_HOSTS in qeeeem/mydbdb (secrets in ledger are not shared).'
+            exit 1
+          fi
+          [[ "$MYDBDB_PORT" =~ ^[0-9]{4,5}$ ]] && (( MYDBDB_PORT >= 1024 && MYDBDB_PORT <= 65535 ))
+          umask 077
+          key="$RUNNER_TEMP/mydbdb-key"
+          hosts="$RUNNER_TEMP/mydbdb-known-hosts"
+          trap 'rm -f -- "$key" "$hosts"' EXIT
+          printf '%s\n' "$DEPLOY_KEY" > "$key"
+          printf '%s\n' "$KNOWN_HOSTS" > "$hosts"
+          opts=(-i "$key" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$hosts" -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3)
+          ssh "${opts[@]}" "$MYDBDB_USER@$MYDBDB_HOST" 'test -f /etc/mydbdb/deploy.conf && test -d /var/lib/mydbdb-deploy/incoming' || {
+            echo '::error::SSH or server setup failed. Run deploy/setup.sh once in the server administrator terminal.'
+            exit 1
+          }
+          scp "${opts[@]}" "$RUNNER_TEMP/mydbdb.tar.gz" "$MYDBDB_USER@$MYDBDB_HOST:/var/lib/mydbdb-deploy/incoming/$RELEASE.tar.gz"
+          ssh "${opts[@]}" "$MYDBDB_USER@$MYDBDB_HOST" "bash -s -- $RELEASE $MYDBDB_PORT" < deploy/publish.sh
+          printf 'Deployed `%s` to https://%s:%s\n' "$GITHUB_SHA" "$MYDBDB_HOST" "$MYDBDB_PORT" >> "$GITHUB_STEP_SUMMARY"
