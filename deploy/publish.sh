@@ -90,13 +90,15 @@ for _attempt in {1..15}; do
 done
 (( healthy == 1 )) || { echo 'New release health check failed.' >&2; exit 1; }
 
-# No login password in CI: check the TLS certificate and unauthenticated barrier.
+# No admin password in CI: check public reading and the protected API boundary.
 # Connecting locally works even before the cloud firewall opens the public port.
-for path in / /media_data.json /api/session /api/add; do
+for path in / /index.html /add.js /media_data.json /api/session /api/search /api/mark /api/connect /api/add; do
+  expected=200
+  if [[ "$path" == /api/* ]]; then expected=401; fi
   status=$(curl --silent --show-error --connect-timeout 5 --max-time 10 \
     --connect-to "8.148.157.132:$PUBLIC_PORT:127.0.0.1:$PUBLIC_PORT" \
     -o /dev/null -w '%{http_code}' "https://8.148.157.132:$PUBLIC_PORT$path")
-  [[ "$status" == 401 ]] || { echo "HTTPS protection check failed: $path ($status)" >&2; exit 1; }
+  [[ "$status" == "$expected" ]] || { echo "HTTPS access check failed: $path ($status; expected $expected)" >&2; exit 1; }
 done
 printf '%s\n' "$release" > "$state/current-release"
 changed=0

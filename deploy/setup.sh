@@ -43,8 +43,8 @@ nginx_user=$(awk '$1 == "user" {gsub(";", "", $2); print $2; exit}' <<< "$config
 test -n "$nginx_user"
 nginx_group=$(id -gn "$nginx_user")
 
-echo 'Set the website login password (user name: owner). Not your NeoDB password.'
-read -rs -p 'Password (at least 12 characters): ' password </dev/tty; echo
+echo 'Browsing is public. Set an admin password ONLY for adding entries and syncing NeoDB (user: owner).'
+read -rs -p 'Admin password (at least 12 characters): ' password </dev/tty; echo
 read -rs -p 'Repeat password: ' confirm </dev/tty; echo
 [[ ${#password} -ge 12 && "$password" == "$confirm" ]] || { echo 'Passwords differ or are too short.' >&2; exit 1; }
 password_hash=$(printf '%s\n' "$password" | openssl passwd -6 -stdin)
@@ -107,16 +107,22 @@ server {
     client_max_body_size 64k;
     access_log off;
     error_log /var/log/nginx/mydbdb-error.log warn;
+    proxy_set_header Host 127.0.0.1:$backend;
+    proxy_set_header Authorization "";
+    proxy_set_header Connection "";
+    proxy_http_version 1.1;
+    proxy_read_timeout 120s;
+    proxy_hide_header WWW-Authenticate;
 
     location = /_health { return 404; }
+    # Only the read-only page, script and collection are public. All APIs retain
+    # the admin check, including session/CSRF and NeoDB account connection.
+    location ~ ^/(index\\.html|add\\.js|media_data\\.json)?\$ {
+        auth_basic off;
+        proxy_pass http://127.0.0.1:$backend;
+    }
     location / {
         proxy_pass http://127.0.0.1:$backend;
-        proxy_set_header Host 127.0.0.1:$backend;
-        proxy_set_header Authorization "";
-        proxy_set_header Connection "";
-        proxy_http_version 1.1;
-        proxy_read_timeout 120s;
-        proxy_hide_header WWW-Authenticate;
     }
 }
 NGINX
@@ -130,5 +136,5 @@ if ! nginx -t || ! systemctl reload nginx; then
 fi
 systemctl daemon-reload
 systemctl enable mydbdb.service
-echo "Setup ready: https://8.148.157.132:$port (login: owner). Open TCP $port only."
+echo "Setup ready: https://8.148.157.132:$port (public browsing; admin: owner). Open TCP $port only."
 echo 'Next: authorize the deployment SSH public key, upload initial media_data.json, then run Deploy mydbdb.'

@@ -16,7 +16,10 @@ async function addRequest(path, payload){
   catch(e){ throw new Error('无法连接本地服务，请运行 python server.py 后打开服务地址'); }
   let data;
   try { data=await response.json(); }
-  catch(e){ throw new Error('当前页面未连接添加服务，请用 python server.py 启动后打开服务地址'); }
+  catch(e){
+    if(response.status===401) throw new Error('添加条目需要管理员验证，请重新打开添加窗口');
+    throw new Error('添加服务未返回有效数据，请稍后重试');
+  }
   if(!response.ok){
     if(response.status===401){
       if(addSession)addSession.connected=false;

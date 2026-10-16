@@ -97,6 +97,15 @@ test('invalid rating never submits',async()=>{
   assert.match(p.nodes.get('add-msg').textContent,/整数/);
 });
 
+test('cancelled admin verification does not claim the local server is missing',async()=>{
+  const p=panel();
+  p.state.handle=async()=>({ok:false,status:401,json:async()=>{throw new SyntaxError('HTML response');}});
+  await p.run('openAddPanel()');
+  assert.equal(p.nodes.get('add-msg').textContent,'添加条目需要管理员验证，请重新打开添加窗口');
+  assert.equal(p.nodes.get('add-submit').disabled,true);
+  assert.equal(p.calls.filter(c=>c.url==='/api/add').length,0);
+});
+
 test('expired authorization exposes reconnect and retains the unsaved draft',async()=>{
   const p=panel();await p.choose();p.nodes.get('add-comment').value='待保存短评';
   p.state.error='授权已失效';p.state.errorStatus=401;

@@ -1,6 +1,6 @@
 # 部署到 8.148.157.132
 
-入口：`https://8.148.157.132:18443`。网站用户名为 `owner`，密码在首次安装时设置。整个网站需要登录，包括收藏 JSON 和添加接口。
+入口：`https://8.148.157.132:18443`。浏览收藏、统计和时间轴无需登录，展示 JSON 中的收藏及短评公开可见。只有点击「添加条目」、连接账号或同步 NeoDB 时需要管理员验证：用户名 `owner`，密码在首次安装时设置。
 
 防火墙只需放行 **TCP 18443**。Python 后端 `18081` 只监听 `127.0.0.1`，不要对公网开放。安装前检查两个端口，发现占用就退出，不停止占用进程。
 
@@ -13,7 +13,7 @@ curl --fail --location https://raw.githubusercontent.com/qeeeem/mydbdb/main/depl
 sudo bash /tmp/mydbdb-setup.sh 18443 18081
 ```
 
-安装需要现有 Nginx、Python 3.10+、OpenSSL、curl、systemd、sudo、flock，并复用服务器已有的 IP 证书 `/etc/nginx/ssl/8.148.157.132/`。脚本不安装系统包、不变更证书续期、不覆盖已有文件。运行时设置网站密码，不要使用 NeoDB 密码。
+安装需要现有 Nginx、Python 3.10+、OpenSSL、curl、systemd、sudo、flock，并复用服务器已有的 IP 证书 `/etc/nginx/ssl/8.148.157.132/`。脚本不安装系统包、不变更证书续期、不覆盖已有文件。运行时设置添加／同步操作的管理员密码，不影响匿名浏览，也不要使用 NeoDB 密码。
 
 当前服务器的系统 Python 是 3.6。Alibaba Cloud Linux 3 可并行安装 Python 3.11，并作为第三个参数指定，**不替换系统 Python，不修改已有应用环境**：
 
@@ -60,10 +60,10 @@ scp -i <部署私钥路径> -o StrictHostKeyChecking=yes deploy/setup.sh ledger-
 | `/var/lib/mydbdb/media_data.json` | 持久化收藏 |
 | `/var/lib/mydbdb/neodb.json` | NeoDB 授权，仅服务用户可读 |
 | `/var/lib/mydbdb-deploy/` | 上传包、发布锁、版本记录 |
-| `/etc/mydbdb/` | 端口配置、网站密码散列 |
+| `/etc/mydbdb/` | 端口配置、管理员密码散列 |
 | `/etc/systemd/system/mydbdb.service` | 独立服务，随机器启动 |
 
-Actions 只上传首页、前端脚本、两份 Python 源码和版本标识。部署前运行测试；发布后校验后端版本、数据可读性、HTTPS 证书和未登录访问的 401 响应。失败时自动切回旧代码；首次发布没有旧版本时保留错误供排查。收藏与授权不会随发布回退。
+Actions 只上传首页、前端脚本、两份 Python 源码和版本标识。部署前运行测试；发布后校验后端版本、数据可读性、HTTPS 证书、匿名浏览的 200 响应，以及全部 API 的未登录 401 响应。失败时自动切回旧代码；首次发布没有旧版本时保留错误供排查。收藏与授权不会随发布回退。
 
 需要用新 ZIP 替换服务器收藏时，先在本地解析并核对，再暂停 **mydbdb** 服务、备份服务器 JSON、传入新 JSON 并重启；不要直接覆盖运行中的数据，避免丢失刚添加的记录。普通代码推送无需这个步骤。
 
