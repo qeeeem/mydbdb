@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>我的书影音</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0e0e0f">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -57,6 +59,8 @@ header {
   padding: 10px 2rem;
   border-bottom: 0.5px solid var(--border);
 }
+.filter-group { display: contents; }
+.timeline-view { display: flex; gap: 5px; margin-left: 8px; }
 .filter-btn {
   padding: 4px 12px; font-size: 12px; border-radius: 20px;
   border: 0.5px solid var(--border2); background: transparent;
@@ -119,7 +123,7 @@ header {
 .stat-label { font-size: 11px; color: var(--text2); margin-bottom: 5px; white-space: nowrap; }
 .stat-val { font-size: 22px; font-weight: 500; letter-spacing: -0.02em; }
 
-.hm-wrap { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--r); padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; overflow-x: auto; }
+.hm-wrap { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--r); padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; }
 .hm-controls { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 1.25rem; }
 .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--text2); }
 .legend-item { display: flex; align-items: center; gap: 5px; }
@@ -128,10 +132,10 @@ header {
 .yr-btn { padding: 4px 11px; font-size: 12px; border-radius: var(--r); border: 0.5px solid var(--border2); background: transparent; color: var(--text2); cursor: pointer; transition: all .15s; font-family: inherit; }
 .yr-btn:hover { background: var(--bg3); color: var(--text); }
 .yr-btn.active { background: var(--bg3); color: var(--text); border-color: rgba(255,255,255,0.25); }
-.hm-grid-wrap { display: flex; gap: 5px; }
+.hm-grid-wrap { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 8px; }
 .day-labels { display: flex; flex-direction: column; gap: 2px; padding-top: 18px; flex-shrink: 0; }
 .day-labels span { height: 11px; line-height: 11px; font-size: 9px; color: var(--text3); text-align: right; padding-right: 5px; white-space: nowrap; }
-.hm-right { min-width: 0; }
+.hm-right { flex-shrink: 0; }
 .month-row { display: grid; grid-template-columns: repeat(53, 11px); gap: 2px; margin-bottom: 3px; height: 14px; }
 .month-row span { font-size: 9px; color: var(--text3); white-space: nowrap; overflow: visible; line-height: 14px; }
 .hm-cells { display: grid; grid-template-rows: repeat(7, 11px); grid-auto-flow: column; grid-auto-columns: 11px; gap: 2px; }
@@ -192,7 +196,7 @@ header {
 }
 
 /* ── shared card ── */
-.card { display: flex; flex-direction: column; gap: 8px; cursor: pointer; }
+.card { display: flex; flex-direction: column; gap: 8px; cursor: pointer; min-width: 0; }
 .poster-wrap {
   position: relative; aspect-ratio: 2/3; border-radius: var(--r);
   overflow: hidden; background: var(--bg3); border: 0.5px solid var(--border);
@@ -219,16 +223,16 @@ header {
 /* ── modal ── */
 .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; z-index: 300; align-items: center; justify-content: center; padding: 1rem; }
 .modal-bg.open { display: flex; }
-.modal-inner { position: relative; max-width: 520px; width: 100%; }
+.modal-inner { position: relative; max-width: 520px; width: 100%; max-height: calc(100dvh - 2rem); overflow-y: auto; border-radius: 14px; }
 .modal { background: var(--bg2); border: 0.5px solid var(--border2); border-radius: 14px; display: flex; gap: 1.25rem; padding: 1.5rem; }
-.modal-poster { width: 110px; flex-shrink: 0; border-radius: 8px; overflow: hidden; background: var(--bg3); aspect-ratio: 2/3; }
+.modal-poster { width: 110px; flex-shrink: 0; align-self: flex-start; border-radius: 8px; overflow: hidden; background: var(--bg3); aspect-ratio: 2/3; }
 .modal-poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .modal-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
-.modal-title { font-size: 16px; font-weight: 500; line-height: 1.4; }
+.modal-title { font-size: 16px; font-weight: 500; line-height: 1.4; padding-right: 28px; overflow-wrap: anywhere; }
 .modal-meta-row { font-size: 12px; color: var(--text2); }
 .modal-rating { font-size: 22px; font-weight: 500; }
 .modal-stars { font-size: 13px; color: var(--col-movie); letter-spacing: 1px; }
-.modal-comment { font-size: 13px; color: var(--text2); line-height: 1.7; border-top: 0.5px solid var(--border); padding-top: 10px; }
+.modal-comment { font-size: 13px; color: var(--text2); line-height: 1.7; border-top: 0.5px solid var(--border); padding-top: 10px; overflow-wrap: anywhere; }
 .modal-close { position: absolute; top: 1rem; right: 1rem; width: 28px; height: 28px; border-radius: 50%; background: var(--bg3); border: 0.5px solid var(--border2); color: var(--text2); cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; }
 </style>
 </head>
@@ -249,7 +253,6 @@ header {
 <!-- ══════════ DASHBOARD ══════════ -->
 <div id="page-dashboard" class="page active">
 <div id="d-tooltip"></div>
-<div style="padding:2rem">
 <div class="dash-wrap">
   <p class="sec-title" style="margin-bottom:.75rem">总览</p>
   <div class="stats" id="d-stats"></div>
@@ -259,7 +262,7 @@ header {
       <div class="legend" id="d-legend"></div>
       <div class="yr-btns" id="d-yr-btns"></div>
     </div>
-    <div class="hm-grid-wrap">
+    <div class="hm-grid-wrap" tabindex="0" role="region" aria-label="全年活动热力图，可横向滚动">
       <div class="day-labels"><span>一</span><span></span><span>三</span><span></span><span>五</span><span></span><span></span></div>
       <div class="hm-right">
         <div class="month-row" id="d-month-row"></div>
@@ -273,11 +276,11 @@ header {
   <div class="yrbar-wrap"><div class="yrbar-inner"><canvas id="d-year-chart"></canvas></div></div>
 </div>
 </div>
-</div>
 
 <!-- ══════════ GALLERY ══════════ -->
 <div id="page-gallery" class="page">
   <div class="filter-row">
+    <div class="filter-group" role="group" aria-label="收藏类别">
     <button class="filter-btn active" data-cat="all">全部</button>
     <button class="filter-btn" data-cat="movie">电影</button>
     <button class="filter-btn" data-cat="tv">剧集</button>
@@ -286,17 +289,20 @@ header {
     <button class="filter-btn" data-cat="music">音乐</button>
     <button class="filter-btn" data-cat="performance">演出</button>
     <button class="filter-btn" data-cat="podcast">播客</button>
+    </div>
     <div class="fdivider"></div>
+    <div class="filter-group" role="group" aria-label="收藏状态">
     <button class="filter-btn active" data-status="all">全部状态</button>
     <button class="filter-btn" data-status="complete">看过</button>
     <button class="filter-btn" data-status="wishlist">想看</button>
     <button class="filter-btn" data-status="progress">在看</button>
     <button class="filter-btn" data-status="dropped">弃坑</button>
+    </div>
 
     <span class="count-label" id="g-count"></span>
   </div>
   <div class="gallery-toolbar">
-    <div class="search-wrap"><input id="g-search" type="text" placeholder="搜索标题…"></div>
+    <div class="search-wrap"><input id="g-search" type="search" placeholder="搜索标题…" aria-label="搜索收藏标题"></div>
     <div class="sort-btns">
       <button class="sort-btn active" data-sort="timestamp">最近标记</button>
       <button class="sort-btn" data-sort="rating">评分</button>
@@ -313,6 +319,7 @@ header {
 <!-- ══════════ TIMELINE ══════════ -->
 <div id="page-timeline" class="page">
   <div class="filter-row">
+    <div class="filter-group" role="group" aria-label="时间轴类别">
     <button class="filter-btn active" data-tcat="all">全部</button>
     <button class="filter-btn" data-tcat="movie">电影</button>
     <button class="filter-btn" data-tcat="tv">剧集</button>
@@ -321,15 +328,18 @@ header {
 <button class="filter-btn" data-tcat="music">音乐</button>
 <button class="filter-btn" data-tcat="performance">演出</button>
 <button class="filter-btn" data-tcat="podcast">播客</button>
+    </div>
     <div class="fdivider"></div>
+    <div class="filter-group" role="group" aria-label="时间轴状态">
     <button class="filter-btn active" data-tstatus="all">全部状态</button>
     <button class="filter-btn" data-tstatus="complete">看过</button>
     <button class="filter-btn" data-tstatus="wishlist">想看</button>
     <button class="filter-btn" data-tstatus="progress">在看</button>
     <button class="filter-btn" data-tstatus="dropped">弃坑</button>
+    </div>
 
     <span class="count-label" id="t-count"></span>
-<div style="display:flex;gap:5px;margin-left:8px">
+<div class="timeline-view">
   <button class="sort-btn active" id="tview-month" onclick="setTView('month')">按月</button>
   <button class="sort-btn" id="tview-day" onclick="setTView('day')">按日</button>
 </div>
@@ -343,7 +353,7 @@ header {
 <!-- ══════════ MODAL ══════════ -->
 <div class="modal-bg" id="modal-bg">
   <div class="modal-inner">
-    <button class="modal-close" id="modal-close">✕</button>
+    <button class="modal-close" id="modal-close" aria-label="关闭详情">✕</button>
     <div class="modal">
       <div class="modal-poster"><img id="m-img" src="" alt=""></div>
       <div class="modal-info">
@@ -396,9 +406,8 @@ let DAILY = {};
 let MONTHLY = {};
 let YEARLY = {};
 const D_CATS = ['movie','tv','book','game','music','performance','podcast'];
-const D_LBL  = {movie:'电影',tv:'剧集',book:'书籍',game:'游戏',music:'音乐',performance:'演出',podcast:'Podcast'};
+const D_LBL  = {movie:'电影',tv:'剧集',book:'书籍',game:'游戏',music:'音乐',performance:'演出',podcast:'播客'};
 const D_MONTHS_ZH = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
-const D_MONTHS_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 let D_YEARS = [];
 
 // ══════════ DASHBOARD ══════════
@@ -475,7 +484,7 @@ function buildHM(year){
     for(let d=0;d<7;d++){
       const dt=new Date(fm); dt.setDate(fm.getDate()+w*7+d);
       const inY=dt.getFullYear()===year, ds=dstr(dt), data=inY?DAILY[ds]:null;
-      if(inY&&dt.getDate()===1) mCols[w]=D_MONTHS_EN[dt.getMonth()];
+      if(inY&&dt.getDate()===1) mCols[w]=D_MONTHS_ZH[dt.getMonth()];
       const cell=document.createElement('div');
       cell.className='cell'+(!inY?' empty':'');
       if(data){
@@ -736,7 +745,78 @@ loadData();
 #data-msg{margin-top:16px;overflow-wrap:anywhere}
 #data-preview{padding:16px;background:var(--bg3);border-radius:var(--r);margin-top:20px}
 #data-preview p+p{margin-top:8px}
-@media(max-width:600px){header{padding:0 12px;gap:10px;height:auto;min-height:52px;flex-wrap:wrap;padding-top:8px;padding-bottom:8px}.header-right{gap:10px}.nav-tabs{order:3;width:100%}.nav-tab{flex:1}.data-panel{padding:20px}.data-overlay{padding-top:24px}.data-panel{max-height:calc(100dvh - 48px)}}
+button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--col-movie); outline-offset: 3px; }
+body:has(.modal-bg.open), body:has(.data-overlay[style*="flex"]) { overflow: hidden; }
+.tl-month { position: relative; margin-bottom: 24px; }
+@media (max-width: 900px) {
+  header { padding-inline: 20px; gap: 20px; }
+  #page-dashboard { padding: 24px 20px; }
+  .filter-row, .gallery-toolbar { padding-inline: 20px; }
+  #page-gallery main { padding-inline: 20px; }
+  #page-timeline main { margin-left: 20px; padding-right: 20px; }
+}
+@media (max-width: 640px) {
+  :root { --text3: #93908b; }
+  header { padding: 8px 16px; gap: 8px; height: auto; flex-wrap: wrap; }
+  .site-title { font-size: 17px; }
+  .header-right { gap: 8px; }
+  .nav-tabs { order: 3; width: 100%; gap: 4px; }
+  .nav-tab { flex: 1; min-height: 44px; padding: 8px; }
+  .add-action { min-height: 44px; padding: 10px 12px; }
+  #page-dashboard { padding: 24px 16px; }
+  .sec-title { font-size: 17px; color: var(--text2); letter-spacing: 0; }
+  .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 28px; }
+  .stat { padding: 12px 8px; }
+  .stat-label { font-size: 12px; }
+  .stat-val { font-size: 23px; }
+  .hm-wrap, .chart-wrap, .yrbar-wrap { padding: 16px 12px; margin-bottom: 28px; }
+  .hm-controls { gap: 16px; margin-bottom: 16px; }
+  .legend { gap: 10px 14px; font-size: 13px; }
+  .yr-btns { width: 100%; gap: 6px; }
+  .yr-btn { flex-shrink: 0; min-height: 44px; padding: 8px 12px; font-size: 14px; }
+  .chart-inner { height: 240px; margin-top: 0; }
+  .yrbar-inner { height: 200px; margin-top: 0; }
+  .filter-row { padding: 12px 16px; gap: 8px; }
+  .filter-group { display: flex; flex: 0 0 100%; gap: 8px; min-width: 0; overflow-x: auto; padding: 2px 0 4px; }
+  .filter-btn { flex-shrink: 0; min-height: 44px; padding: 8px 14px; font-size: 14px; }
+  .fdivider { display: none; }
+  .count-label { margin-left: 0; font-size: 13px; }
+  .timeline-view { margin-left: auto; }
+  .gallery-toolbar { padding: 12px 16px; flex-direction: column; align-items: stretch; gap: 10px; }
+  .search-wrap, .search-wrap input { width: 100%; }
+  .search-wrap input { min-height: 44px; font-size: 16px; }
+  .sort-btns { display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .sort-btn { min-height: 44px; padding: 8px; font-size: 13px; }
+  #page-gallery main { padding: 20px 16px 32px; }
+  .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 10px; }
+  .card-title { font-size: 14px; -webkit-line-clamp: 2; line-clamp: 2; }
+  .card-meta { font-size: 12px; }
+  #page-timeline main { margin-left: 16px; padding: 16px 16px 32px 0; }
+  .tl-year-header { min-height: 44px; padding-left: 12px; }
+  .tl-month-header { padding-left: 12px; }
+  .tl-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding-left: 12px; gap: 20px 10px; }
+  #page-timeline .card { width: auto; }
+  .modal-bg { align-items: flex-end; padding: 12px; }
+  .modal-inner { max-height: calc(100dvh - 24px); }
+  .modal { padding: 20px 16px max(20px, env(safe-area-inset-bottom)); gap: 16px; }
+  .modal-poster { width: 80px; }
+  .modal-title { font-size: 18px; padding-right: 36px; }
+  .modal-meta-row, .modal-comment { font-size: 14px; }
+  .modal-close { top: 8px; right: 8px; width: 44px; height: 44px; }
+  .data-overlay { padding: 12px; align-items: flex-end; }
+  .data-panel { padding: 20px 16px max(20px, env(safe-area-inset-bottom)); max-height: calc(100dvh - 24px); font-size: 16px; }
+}
+@media (max-width: 359px) {
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid, .tl-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .modal { flex-direction: column; }
+}
+@media (hover: none) {
+  .poster-wrap:hover .poster-overlay { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; }
+}
 </style>
 
 <div id="data-bg" class="data-overlay">

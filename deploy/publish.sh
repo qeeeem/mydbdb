@@ -60,7 +60,7 @@ trap 'exit 143' TERM HUP
 mkdir "$target"
 mkdir "$target/vendor"
 # Extract only explicit code files, never paths supplied by an archive.
-for file in index.html add.js server.py fetch_posters.py data_tools.py vendor/fflate.js vendor/fflate.LICENSE RELEASE; do
+for file in index.html favicon.svg add.js server.py fetch_posters.py data_tools.py vendor/fflate.js vendor/fflate.LICENSE RELEASE; do
   tar -xOzf "$archive" "$file" > "$target/$file"
   test -s "$target/$file"
 done
@@ -94,7 +94,7 @@ done
 
 # No password in CI: require authentication for the page, data and every API.
 # Connecting locally works even before the cloud firewall opens the public port.
-for path in / /index.html /add.js /media_data.json /api/data /api/import/library.js /api/import/start /api/import/chunk /api/import/finish /api/data/commit /api/data/cancel; do
+for path in / /index.html /favicon.svg /add.js /media_data.json /api/data /api/import/library.js /api/import/start /api/import/chunk /api/import/finish /api/data/commit /api/data/cancel; do
   expected=401
   status=$(curl --silent --show-error --connect-timeout 5 --max-time 10 \
     --connect-to "8.148.157.132:$PUBLIC_PORT:127.0.0.1:$PUBLIC_PORT" \

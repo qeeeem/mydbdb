@@ -20,7 +20,7 @@ class ServerTests(unittest.TestCase):
         self.root.mkdir()
         self.state = Path(self.temp.name) / "state"
         self.state.mkdir()
-        for name in ("index.html", "add.js"):
+        for name in ("index.html", "add.js", "favicon.svg"):
             (self.root / name).write_bytes((server.ROOT / name).read_bytes())
         (self.root / "vendor").mkdir()
         (self.root / "vendor" / "fflate.js").write_bytes((server.ROOT / "vendor" / "fflate.js").read_bytes())
@@ -52,13 +52,19 @@ class ServerTests(unittest.TestCase):
             return response.status, data
 
     def test_public_files_and_private_paths(self):
-        for path in ("/", "/index.html", "/add.js", "/media_data.json", "/api/import/library.js"):
+        for path in ("/", "/index.html", "/add.js", "/media_data.json", "/favicon.svg", "/api/import/library.js"):
             self.assertEqual(self.request(path)[0], 200)
         for path in ("/import-owner.json", "/neodb.json", "/web-import.json", "/backups/", "/.git/config",
                      "/server.py", "/data/export.zip", "/vendor/fflate.js", "/../state/import-owner.json"):
             self.assertEqual(self.request(path)[0], 404)
         for path in ("/", "/add.js", "/api/data"):
             self.assertNotIn("fixture-owner", str(self.request(path)[1]))
+
+    def test_favicon_is_linked_and_served_as_svg(self):
+        self.assertIn(b'href="favicon.svg"', self.request("/")[1])
+        with urlopen(self.base + "/favicon.svg", timeout=5) as response:
+            self.assertEqual(response.headers.get_content_type(), "image/svg+xml")
+            self.assertEqual(response.read(), (self.root / "favicon.svg").read_bytes())
 
     def test_removed_add_and_sync_interfaces_are_gone(self):
         for path in ("/api/session", "/api/search", "/api/mark", "/api/connect", "/api/add", "/api/sync/start"):

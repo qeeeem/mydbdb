@@ -110,12 +110,13 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_body(200, app.data.status())
             elif url.path == "/api/import/library.js":
                 self.send_body(200, (app.root / "vendor" / "fflate.js").read_bytes(), "text/javascript; charset=utf-8")
-            elif url.path in ("/", "/index.html", "/add.js", "/media_data.json"):
+            elif url.path in ("/", "/index.html", "/add.js", "/media_data.json", "/favicon.svg"):
                 name = "index.html" if url.path == "/" else url.path[1:]
                 file = app.data_path if name == "media_data.json" else app.root / name
                 if not file.is_file():
                     raise AppError("文件不存在", 404)
-                mime = {".html": "text/html", ".js": "text/javascript", ".json": "application/json"}[file.suffix]
+                mime = {".html": "text/html", ".js": "text/javascript", ".json": "application/json",
+                        ".svg": "image/svg+xml"}[file.suffix]
                 self.send_body(200, file.read_bytes(), mime + "; charset=utf-8")
             else:
                 raise AppError("文件或接口不存在", 404)
